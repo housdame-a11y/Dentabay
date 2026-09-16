@@ -226,6 +226,10 @@
   .profile-card{cursor:default;}
   .profile-card:hover{transform:none; box-shadow:var(--shadow);}
   .clinic-dot{width:14px;height:14px;border-radius:50%; flex-shrink:0;}
+  .avatar-dot{
+    width:34px; height:34px; border-radius:50%; background:var(--ink); color:var(--white);
+    font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
   .clinic-card .info{flex:1; min-width:0;}
   .clinic-card .info .name{font-weight:600; font-size:14.5px;}
   .clinic-card .info .sub{font-size:12.5px; color:var(--slate); margin-top:2px;}
@@ -305,6 +309,12 @@
   }
   .rate-toggle button.active{background:var(--teal); color:var(--white); border-color:var(--teal);}
   .rate-toggle button:not(.active):hover{border-color:var(--teal); color:var(--teal-deep);}
+  .fraction-presets{display:flex; gap:6px; margin-top:8px;}
+  .fraction-presets button{
+    padding:6px 12px; border-radius:20px; border:1px solid var(--sand-line); background:var(--white);
+    font-size:12.5px; font-weight:600; color:var(--slate); cursor:pointer;
+  }
+  .fraction-presets button:hover{border-color:var(--teal); color:var(--teal-deep);}
   .sheet-actions{display:flex; gap:10px; margin-top:6px;}
   .sheet-actions button{
     flex:1; padding:13px; border-radius:12px; border:none; font-size:14.5px; font-weight:600; cursor:pointer;
@@ -392,7 +402,7 @@
         <input type="time" id="f_end">
       </div>
     </div>
-    <div class="field">
+    <div class="field" id="f_pay_wrap">
       <label>Pay for this shift (DA)</label>
       <input type="number" id="f_pay" min="0" step="100">
     </div>
@@ -426,12 +436,18 @@
       <input type="text" id="c_contact" placeholder="Phone or name to reach">
     </div>
     <div class="rate-toggle">
-      <button data-rate="hourly" class="active">Hourly rate</button>
+      <button data-rate="split" class="active">Split of payments</button>
+      <button data-rate="hourly">Hourly rate</button>
       <button data-rate="flat">Flat per shift</button>
     </div>
     <div class="field">
-      <label id="c_rateLabel">Rate per hour (DA)</label>
-      <input type="number" id="c_rate" min="0" step="100">
+      <label id="c_rateLabel">Your share of each patient payment (%)</label>
+      <input type="number" id="c_rate" min="0" max="100" step="0.01" placeholder="33.33">
+      <div class="fraction-presets" id="fractionPresets">
+        <button type="button" data-frac="33.33">1/3</button>
+        <button type="button" data-frac="25">1/4</button>
+        <button type="button" data-frac="50">1/2</button>
+      </div>
     </div>
     <div class="sheet-actions">
       <button class="btn-ghost" id="clinicCancel">Cancel</button>
@@ -554,7 +570,7 @@
   </div>
 </div>
 
-<!-- Doctor profile / onboarding modal -->
+<!-- Doctor profile / sign up modal -->
 <div class="overlay" id="doctorOverlay">
   <div class="sheet">
     <div class="sheet-handle" id="doctorHandle"></div>
@@ -576,10 +592,23 @@
       <button class="btn-ghost" id="doctorCancel">Cancel</button>
       <button class="btn-primary" id="doctorSave">Get started</button>
     </div>
+    <button class="add-clinic-btn" id="backToPickerBtn" style="display:none; margin-top:12px;">← Choose an existing profile instead</button>
+  </div>
+</div>
+
+<!-- Choose profile modal -->
+<div class="overlay" id="profilePickerOverlay">
+  <div class="sheet">
+    <div class="sheet-handle" id="pickerHandle"></div>
+    <h2>Choose your profile</h2>
+    <p style="font-size:13px; color:var(--slate); margin:-8px 0 16px;">This device has more than one profile saved.</p>
+    <div id="profilePickerList"></div>
+    <button class="btn-outline" id="addProfileFromPickerBtn">+ Add a new profile</button>
   </div>
 </div>
 
 <script>
+
 (function(){
   "use strict";
 
@@ -599,13 +628,21 @@
   };
   if(!state.recurringSkips) state.recurringSkips = [];
   if(!state.patients) state.patients = [];
-  if(state.doctorProfile===undefined) state.doctorProfile = null;
+  if(!state.doctorProfiles) state.doctorProfiles = [];
+  if(state.activeProfileId===undefined) state.activeProfileId = null;
+  if(state.doctorProfile && state.doctorProfiles.length===0){
+    var migrated = { id: uid(), name: state.doctorProfile.name||"", specialty: state.doctorProfile.specialty||"", phone: state.doctorProfile.phone||"" };
+    state.doctorProfiles.push(migrated);
+    state.activeProfileId = migrated.id;
+    delete state.doctorProfile;
+  }
   var patientFilter = "all";
   var patientSearch = "";
   var editingPatientId = null;
   var currentPatientDraft = null;
   var isExistingPatient = false;
   var isOnboarding = false;
+  var isCreatingNewProfile = true;
   var SLOTS = ["morning","afternoon","evening"];
   var SLOT_LABELS = {morning:"Morning", afternoon:"Afternoon", evening:"Evening"};
   var DAY_ORDER = [1,2,3,4,5,6,0]; // Mon..Sun for the timetable grid
@@ -618,7 +655,7 @@
   var earningsScope = "month";
   var editingShiftId = null;
   var editingClinicId = null;
-  var rateMode = "hourly";
+  var rateMode = "split";
 
   function load(){
     try{
@@ -664,9 +701,14 @@
   function timeToMin(t){ var p=t.split(":"); return (+p[0])*60 + (+p[1]); }
   function computePay(clinic, start, end){
     if(!clinic) return 0;
+    if(clinic.rateType==='split') return 0;
     if(clinic.rateType==='flat') return +clinic.rate||0;
     var mins = timeToMin(end)-timeToMin(start);
     return mins>0 ? Math.round((+clinic.rate||0) * (mins/60)) : 0;
+  }
+  function doctorShare(clinic, amount){
+    if(!clinic || clinic.rateType!=='split') return 0;
+    return Math.round((+amount||0) * ((+clinic.rate||0)/100));
   }
   function overlaps(a,b){
     if(a.date!==b.date) return false;
@@ -734,13 +776,27 @@
   }
 
   /* ---------------- Render root ---------------- */
+  function sumPaymentShares(predicate){
+    var total = 0;
+    state.patients.forEach(function(p){
+      p.payments.forEach(function(pay){
+        if(predicate(pay)) total += (+pay.share||0);
+      });
+    });
+    return total;
+  }
+
   function updateHeaderIncome(){
     var now = new Date();
-    var total = state.shifts.filter(function(s){
+    var shiftTotal = state.shifts.filter(function(s){
       var d = fromISO(s.date);
       return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && s.status==='confirmed';
     }).reduce(function(a,s){ return a+(+s.pay||0); },0);
-    document.getElementById('headerIncome').textContent = fmtMoney(total);
+    var shareTotal = sumPaymentShares(function(pay){
+      var d = fromISO(pay.date);
+      return pay.status==='paid' && d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+    });
+    document.getElementById('headerIncome').textContent = fmtMoney(shiftTotal + shareTotal);
   }
 
   function render(){
@@ -845,11 +901,15 @@
       return d.getFullYear()===monthAnchor.getFullYear() && d.getMonth()===monthAnchor.getMonth();
     });
     var confirmedCount = monthShifts.filter(function(s){return s.status==='confirmed';}).length;
-    var totalEarn = monthShifts.reduce(function(a,s){return a+(+s.pay||0);},0);
+    var shiftEarn = monthShifts.reduce(function(a,s){return a+(+s.pay||0);},0);
+    var shareEarn = sumPaymentShares(function(pay){
+      var d = fromISO(pay.date);
+      return pay.status==='paid' && d.getFullYear()===monthAnchor.getFullYear() && d.getMonth()===monthAnchor.getMonth();
+    });
     html += '<div class="month-summary">'+
       '<div class="row"><span>Shifts this month</span><span>'+monthShifts.length+'</span></div>'+
       '<div class="row"><span>Confirmed</span><span>'+confirmedCount+' of '+monthShifts.length+'</span></div>'+
-      '<div class="row"><span>Expected earnings</span><span>'+fmtMoney(totalEarn)+'</span></div>'+
+      '<div class="row"><span>Expected earnings</span><span>'+fmtMoney(shiftEarn + shareEarn)+'</span></div>'+
       '</div>';
 
     main.innerHTML = html;
@@ -970,7 +1030,8 @@
   function patientTotals(p){
     var paid = p.payments.filter(function(x){return x.status==='paid';}).reduce(function(a,x){return a+(+x.amount||0);},0);
     var pending = p.payments.filter(function(x){return x.status==='pending';}).reduce(function(a,x){return a+(+x.amount||0);},0);
-    return {paid:paid, pending:pending};
+    var myShare = p.payments.filter(function(x){return x.status==='paid';}).reduce(function(a,x){return a+(+x.share||0);},0);
+    return {paid:paid, pending:pending, myShare:myShare};
   }
   function lastVisitDate(p){
     if(!p.payments.length) return null;
@@ -1136,7 +1197,9 @@
         return '<div class="shift-card" style="border-left-color:'+(pay.status==='paid'?'var(--teal)':'var(--gold)')+'">'+
           '<div class="time-col"><div class="t1">'+fmtMoney(pay.amount)+'</div><div class="t2">'+pay.date+'</div></div>'+
           '<div class="body"><div class="clinic-name">'+escapeHTML(pay.treatment||'Payment')+'</div>'+
-          '<div class="meta">'+(pay.status==='paid'?'<span class="badge confirmed">Paid</span>':'<span class="badge pending">Pending</span>')+(pay.note?'<span>'+escapeHTML(pay.note)+'</span>':'')+'</div></div>'+
+          '<div class="meta">'+(pay.status==='paid'?'<span class="badge confirmed">Paid</span>':'<span class="badge pending">Pending</span>')+(pay.note?'<span>'+escapeHTML(pay.note)+'</span>':'')+'</div>'+
+          (pay.share>0 ? '<div class="meta" style="margin-top:2px;"><span style="color:var(--teal-deep); font-weight:600;">Your share: '+fmtMoney(pay.share)+'</span></div>' : '')+
+          '</div>'+
           '<button class="kebab" data-delpay="'+pay.id+'" title="Delete">✕</button>'+
         '</div>';
       }).join('');
@@ -1152,6 +1215,7 @@
     var t = patientTotals(p);
     var totalsHtml = '<div class="row"><span>Paid</span><span>'+fmtMoney(t.paid)+'</span></div>';
     if(t.pending>0) totalsHtml += '<div class="row"><span>Pending</span><span>'+fmtMoney(t.pending)+'</span></div>';
+    if(t.myShare>0) totalsHtml += '<div class="row"><span>Your share</span><span>'+fmtMoney(t.myShare)+'</span></div>';
     document.getElementById('patientTotals').innerHTML = totalsHtml;
   }
 
@@ -1170,47 +1234,62 @@
     var amount = +document.getElementById('pay_amount').value || 0;
     var date = document.getElementById('pay_date').value;
     if(!amount || !date || !currentPatientDraft) return;
+    var clinic = getClinic(currentPatientDraft.clinicId);
     currentPatientDraft.payments.push({
       id: uid(),
       amount: amount,
       date: date,
       status: document.getElementById('pay_status').value,
       treatment: document.getElementById('pay_treatment').value,
-      note: document.getElementById('pay_note').value.trim()
+      note: document.getElementById('pay_note').value.trim(),
+      share: doctorShare(clinic, amount)
     });
     if(isExistingPatient) save();
     closePaymentModal();
     renderPatientPayments(currentPatientDraft);
   }
 
-  /* ---------------- Doctor profile / onboarding ---------------- */
-  function openDoctorModal(onboarding){
-    isOnboarding = !!onboarding;
+  /* ---------------- Doctor profile: sign up / choose profile ---------------- */
+  function activeProfile(){
+    return state.doctorProfiles.find(function(x){return x.id===state.activeProfileId;}) || null;
+  }
+
+  function showProfileGate(){
+    if(state.doctorProfiles.length===0) openDoctorModal('signup', true);
+    else openProfilePicker(true);
+  }
+
+  function openDoctorModal(mode, mandatory){
+    isOnboarding = !!mandatory;
+    isCreatingNewProfile = (mode==='signup');
     var titleEl = document.getElementById('doctorModalTitle');
     var introEl = document.getElementById('doctorIntro');
     var cancelBtn = document.getElementById('doctorCancel');
     var saveBtn = document.getElementById('doctorSave');
     var handle = document.getElementById('doctorHandle');
-    if(onboarding){
-      titleEl.textContent = "Welcome to DentaBay";
+    var backBtn = document.getElementById('backToPickerBtn');
+    if(isCreatingNewProfile){
+      var firstEver = state.doctorProfiles.length===0;
+      titleEl.textContent = firstEver ? "Sign up for DentaBay" : "Add a profile";
+      introEl.textContent = firstEver ? "A few details before you get started." : "Create a separate profile for another dentist using this device.";
       introEl.style.display = "block";
-      cancelBtn.style.display = "none";
-      saveBtn.textContent = "Get started";
-      handle.style.display = "none";
+      saveBtn.textContent = firstEver ? "Get started" : "Create profile";
       document.getElementById('d_name').value = "";
       document.getElementById('d_specialty').value = "";
       document.getElementById('d_phone').value = "";
+      backBtn.style.display = (isOnboarding && !firstEver) ? "block" : "none";
     } else {
-      var d = state.doctorProfile || {};
+      var d = activeProfile() || {};
       titleEl.textContent = "Edit profile";
       introEl.style.display = "none";
-      cancelBtn.style.display = "block";
       saveBtn.textContent = "Save";
-      handle.style.display = "block";
       document.getElementById('d_name').value = d.name||"";
       document.getElementById('d_specialty').value = d.specialty||"";
       document.getElementById('d_phone').value = d.phone||"";
+      backBtn.style.display = "none";
     }
+    cancelBtn.style.display = isOnboarding ? "none" : "block";
+    handle.style.display = isOnboarding ? "none" : "block";
     document.getElementById('doctorOverlay').classList.add('open');
   }
   function closeDoctorModal(){
@@ -1220,23 +1299,59 @@
   function saveDoctorProfile(){
     var name = document.getElementById('d_name').value.trim();
     if(!name) return;
-    state.doctorProfile = {
-      name: name,
-      specialty: document.getElementById('d_specialty').value.trim(),
-      phone: document.getElementById('d_phone').value.trim()
-    };
+    if(isCreatingNewProfile){
+      var obj = {
+        id: uid(),
+        name: name,
+        specialty: document.getElementById('d_specialty').value.trim(),
+        phone: document.getElementById('d_phone').value.trim()
+      };
+      state.doctorProfiles.push(obj);
+      state.activeProfileId = obj.id;
+    } else {
+      var d = activeProfile();
+      d.name = name;
+      d.specialty = document.getElementById('d_specialty').value.trim();
+      d.phone = document.getElementById('d_phone').value.trim();
+    }
     save();
     isOnboarding = false;
     document.getElementById('doctorOverlay').classList.remove('open');
     render();
   }
 
+  function openProfilePicker(mandatory){
+    isOnboarding = !!mandatory;
+    document.getElementById('pickerHandle').style.display = isOnboarding ? "none" : "block";
+    var list = document.getElementById('profilePickerList');
+    list.innerHTML = state.doctorProfiles.map(function(p){
+      return '<div class="clinic-card" data-pid="'+p.id+'">'+
+        '<span class="avatar-dot">'+escapeHTML((p.name||'?').charAt(0).toUpperCase())+'</span>'+
+        '<div class="info"><div class="name">'+escapeHTML(p.name)+'</div><div class="sub">'+(p.specialty?escapeHTML(p.specialty):'')+'</div></div>'+
+      '</div>';
+    }).join('');
+    list.querySelectorAll('[data-pid]').forEach(function(el){
+      el.onclick = function(){
+        state.activeProfileId = el.dataset.pid;
+        save();
+        isOnboarding = false;
+        document.getElementById('profilePickerOverlay').classList.remove('open');
+        render();
+      };
+    });
+    document.getElementById('profilePickerOverlay').classList.add('open');
+  }
+  function closeProfilePicker(){
+    if(isOnboarding) return;
+    document.getElementById('profilePickerOverlay').classList.remove('open');
+  }
+
   /* ---------------- Clinics view ---------------- */
   function renderClinics(main){
     document.getElementById('monthLabel').textContent = state.clinics.length+" clinic"+(state.clinics.length===1?"":"s");
-    var d = state.doctorProfile || {};
+    var d = activeProfile() || {};
     var html = '<div class="clinic-card profile-card">'+
-        '<span class="clinic-dot" style="background:var(--ink)"></span>'+
+        '<span class="avatar-dot">'+escapeHTML((d.name||'?').charAt(0).toUpperCase())+'</span>'+
         '<div class="info"><div class="name">'+escapeHTML(d.name||'Your profile')+'</div>'+
           '<div class="sub">'+(d.specialty?escapeHTML(d.specialty):'Add your title')+(d.phone?' · '+escapeHTML(d.phone):'')+'</div></div>'+
         '<button class="btn-outline" id="editProfileBtn" style="width:auto; padding:8px 16px; margin:0;">Edit</button>'+
@@ -1260,7 +1375,8 @@
       html += '<button class="add-clinic-btn" id="addClinicBtn">+ Add another clinic</button>';
     }
 
-    html += '<button class="add-clinic-btn" id="logoutBtn" style="border-color:#F0C9C1; color:var(--coral); margin-top:22px;">Log out</button>';
+    html += '<button class="btn-outline" id="switchProfileBtn" style="margin-top:22px;">Switch / add profile</button>';
+    html += '<button class="add-clinic-btn" id="logoutBtn" style="border-color:#F0C9C1; color:var(--coral); margin-top:10px;">Log out</button>';
 
     main.innerHTML = html;
     var b1 = document.getElementById('emptyAddClinicBtn'); if(b1) b1.onclick=function(){openClinicModal(null);};
@@ -1268,13 +1384,14 @@
     document.querySelectorAll('.clinic-card[data-id]').forEach(function(el){
       el.onclick = function(){ openClinicModal(el.dataset.id); };
     });
-    document.getElementById('editProfileBtn').onclick = function(){ openDoctorModal(false); };
+    document.getElementById('editProfileBtn').onclick = function(){ openDoctorModal('edit', false); };
+    document.getElementById('switchProfileBtn').onclick = function(){ openProfilePicker(false); };
     document.getElementById('logoutBtn').onclick = function(){
-      if(!confirm("Log out of DentaBay? Your clinics, shifts and patients stay saved on this device — you'll just need to re-enter your profile next time.")) return;
-      state.doctorProfile = null;
+      if(!confirm("Log out of DentaBay? Your clinics, shifts and patients stay saved on this device — you'll just need to choose or sign in to a profile next time.")) return;
+      state.activeProfileId = null;
       save();
       render();
-      openDoctorModal(true);
+      showProfileGate();
     };
   }
 
@@ -1282,23 +1399,32 @@
   function renderEarnings(main){
     document.getElementById('monthLabel').textContent = "";
     var now = new Date();
-    var scopeShifts;
-    var label;
+    var inScope, label;
     if(earningsScope==='week'){
       var ws = startOfWeek(now), we = addDays(ws,6);
-      scopeShifts = state.shifts.filter(function(s){ return s.date>=toISO(ws) && s.date<=toISO(we); });
+      var wsIso = toISO(ws), weIso = toISO(we);
+      inScope = function(dateStr){ return dateStr>=wsIso && dateStr<=weIso; };
       label = "This week";
     } else {
-      scopeShifts = state.shifts.filter(function(s){
-        var d = fromISO(s.date);
-        return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
-      });
+      inScope = function(dateStr){ var d=fromISO(dateStr); return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth(); };
       label = "This month";
     }
-    var confirmed = scopeShifts.filter(function(s){return s.status==='confirmed';});
-    var pending = scopeShifts.filter(function(s){return s.status==='pending';});
-    var confirmedTotal = confirmed.reduce(function(a,s){return a+(+s.pay||0);},0);
-    var pendingTotal = pending.reduce(function(a,s){return a+(+s.pay||0);},0);
+
+    var scopeShifts = state.shifts.filter(function(s){ return inScope(s.date); });
+    var confirmedShiftTotal = scopeShifts.filter(function(s){return s.status==='confirmed';}).reduce(function(a,s){return a+(+s.pay||0);},0);
+    var pendingShiftTotal = scopeShifts.filter(function(s){return s.status==='pending';}).reduce(function(a,s){return a+(+s.pay||0);},0);
+
+    var scopePayments = [];
+    state.patients.forEach(function(p){
+      p.payments.forEach(function(pay){
+        if(inScope(pay.date)) scopePayments.push({clinicId:p.clinicId, status:pay.status, share:+pay.share||0});
+      });
+    });
+    var confirmedShareTotal = scopePayments.filter(function(x){return x.status==='paid';}).reduce(function(a,x){return a+x.share;},0);
+    var pendingShareTotal = scopePayments.filter(function(x){return x.status==='pending';}).reduce(function(a,x){return a+x.share;},0);
+
+    var confirmedTotal = confirmedShiftTotal + confirmedShareTotal;
+    var pendingTotal = pendingShiftTotal + pendingShareTotal;
 
     var html = '<div class="earnings-hero"><div class="label">Confirmed earnings — '+label.toLowerCase()+'</div>'+
       '<div class="amount">'+fmtMoney(confirmedTotal)+'</div>'+
@@ -1309,12 +1435,16 @@
       '<button data-scope="month" class="'+(earningsScope==='month'?'active':'')+'">Month</button>'+
       '</div>';
 
-    if(scopeShifts.length===0){
-      html += '<div class="empty-state"><div class="serif">Nothing booked '+label.toLowerCase()+'</div><p>Earnings appear here once you add shifts.</p></div>';
+    var hasAnything = scopeShifts.length>0 || scopePayments.length>0;
+    if(!hasAnything){
+      html += '<div class="empty-state"><div class="serif">Nothing booked '+label.toLowerCase()+'</div><p>Earnings appear here once you add shifts or payments.</p></div>';
     } else {
       var byClinic = {};
       scopeShifts.forEach(function(s){
         byClinic[s.clinicId] = (byClinic[s.clinicId]||0) + (+s.pay||0);
+      });
+      scopePayments.forEach(function(x){
+        if(x.share>0) byClinic[x.clinicId] = (byClinic[x.clinicId]||0) + x.share;
       });
       var maxVal = Math.max.apply(null, Object.keys(byClinic).map(function(k){return byClinic[k];}));
       Object.keys(byClinic).sort(function(a,b){return byClinic[b]-byClinic[a];}).forEach(function(cid){
@@ -1335,6 +1465,12 @@
   function refreshClinicSelect(){
     var sel = document.getElementById('f_clinic');
     sel.innerHTML = state.clinics.map(function(c){ return '<option value="'+c.id+'">'+escapeHTML(c.name)+'</option>'; }).join('');
+  }
+
+  function updatePayFieldVisibility(){
+    var c = getClinic(document.getElementById('f_clinic').value);
+    var isSplit = c && c.rateType==='split';
+    document.getElementById('f_pay_wrap').style.display = isSplit ? "none" : "block";
   }
 
   function openShiftModal(id, presetDate){
@@ -1369,6 +1505,7 @@
       document.getElementById('f_notes').value = "";
       autofillPay();
     }
+    updatePayFieldVisibility();
     document.getElementById('shiftOverlay').classList.add('open');
   }
   function closeShiftModal(){ document.getElementById('shiftOverlay').classList.remove('open'); }
@@ -1378,6 +1515,7 @@
     if(!c) return;
     var start = document.getElementById('f_start').value, end = document.getElementById('f_end').value;
     document.getElementById('f_pay').value = computePay(c, start, end);
+    updatePayFieldVisibility();
   }
 
   function saveShift(){
@@ -1443,7 +1581,7 @@
       document.getElementById('c_address').value = "";
       document.getElementById('c_contact').value = "";
       document.getElementById('c_rate').value = "";
-      setRateMode("hourly");
+      setRateMode("split");
     }
     document.getElementById('clinicOverlay').classList.add('open');
   }
@@ -1452,7 +1590,11 @@
   function setRateMode(mode){
     rateMode = mode;
     document.querySelectorAll('.rate-toggle button').forEach(function(b){ b.classList.toggle('active', b.dataset.rate===mode); });
-    document.getElementById('c_rateLabel').textContent = mode==='hourly' ? "Rate per hour (DA)" : "Flat rate per shift (DA)";
+    var labels = {split:"Your share of each patient payment (%)", hourly:"Rate per hour (DA)", flat:"Flat rate per shift (DA)"};
+    document.getElementById('c_rateLabel').textContent = labels[mode];
+    document.getElementById('c_rate').placeholder = mode==='split' ? "33.33" : "";
+    document.getElementById('c_rate').max = mode==='split' ? "100" : "";
+    document.getElementById('fractionPresets').style.display = mode==='split' ? "flex" : "none";
   }
 
   function saveClinic(){
@@ -1503,7 +1645,7 @@
   document.getElementById('shiftSave').onclick = saveShift;
   document.getElementById('shiftDelete').onclick = deleteShift;
   ['f_clinic','f_start','f_end'].forEach(function(id){
-    document.getElementById(id).addEventListener('change', function(){ if(!editingShiftId) autofillPay(); });
+    document.getElementById(id).addEventListener('change', function(){ if(!editingShiftId) autofillPay(); else updatePayFieldVisibility(); });
   });
   document.getElementById('shiftOverlay').addEventListener('click', function(e){ if(e.target===this) closeShiftModal(); });
 
@@ -1511,6 +1653,7 @@
   document.getElementById('clinicSave').onclick = saveClinic;
   document.getElementById('clinicDelete').onclick = deleteClinic;
   document.querySelectorAll('.rate-toggle button').forEach(function(b){ b.onclick = function(){ setRateMode(b.dataset.rate); }; });
+  document.querySelectorAll('#fractionPresets button').forEach(function(b){ b.onclick = function(){ document.getElementById('c_rate').value = b.dataset.frac; }; });
   document.getElementById('clinicOverlay').addEventListener('click', function(e){ if(e.target===this) closeClinicModal(); });
 
   document.getElementById('slotCancel').onclick = closeSlotModal;
@@ -1530,10 +1673,21 @@
   document.getElementById('doctorCancel').onclick = closeDoctorModal;
   document.getElementById('doctorSave').onclick = saveDoctorProfile;
   document.getElementById('doctorOverlay').addEventListener('click', function(e){ if(e.target===this && !isOnboarding) closeDoctorModal(); });
+  document.getElementById('backToPickerBtn').onclick = function(){
+    document.getElementById('doctorOverlay').classList.remove('open');
+    openProfilePicker(true);
+  };
+
+  document.getElementById('addProfileFromPickerBtn').onclick = function(){
+    var mandatory = isOnboarding;
+    document.getElementById('profilePickerOverlay').classList.remove('open');
+    openDoctorModal('signup', mandatory);
+  };
+  document.getElementById('profilePickerOverlay').addEventListener('click', function(e){ if(e.target===this) closeProfilePicker(); });
 
   generateRecurringShifts();
   render();
-  if(!state.doctorProfile){ openDoctorModal(true); }
+  if(!state.activeProfileId){ showProfileGate(); }
 })();
 </script>
 </body>
