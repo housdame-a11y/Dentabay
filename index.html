@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>DentaBay</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#16232E;
+    --paper:#FBF9F4;
+    --sand:#EFE9DC;
+    --sand-line:#DED5C0;
+    --teal:#2F6F62;
+    --teal-deep:#1F4E44;
+    --coral:#D95C4A;
+    --slate:#6B7280;
+    --gold:#C79A3F;
+    --white:#FFFFFF;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(22,35,46,.06), 0 4px 14px rgba(22,35,46,.06);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+    padding-bottom:84px;
+    line-height:1.45;
+  }
+  h1,h2,h3,.serif{font-family:'Fraunces',serif; line-height:1.25;}
+  button{font-family:inherit; transition:transform .1s ease, background-color .15s ease, border-color .15s ease, color .15s ease, opacity .15s ease;}
+  button:active{transform:scale(.96);}
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible{
+    outline:2px solid var(--teal); outline-offset:1px;
+  }
+  ::selection{background:var(--teal); color:var(--white);}
+
+  /* ---------- Top bar ---------- */
+  header.topbar{
+    position:sticky; top:0; z-index:30;
+    background:var(--ink); color:var(--white);
+    padding:14px 18px; display:flex; align-items:center; justify-content:space-between; gap:12px;
+    box-shadow:0 2px 10px rgba(22,35,46,.18);
+  }
+  .topbar-brand{
+    font-family:'Fraunces',serif; font-size:19px; font-weight:600; letter-spacing:-.01em; flex-shrink:0;
+  }
+  .topbar-income{
+    display:flex; flex-direction:column; align-items:flex-end; flex:1; min-width:0; margin-right:2px;
+  }
+  .topbar-income .tb-label{font-size:10.5px; color:#AEB9C2; text-transform:uppercase; letter-spacing:.04em;}
+  .topbar-income .tb-amount{font-family:'Fraunces',serif; font-size:17px; font-weight:600; color:var(--gold); white-space:nowrap;}
+  .settings-btn{
+    width:34px; height:34px; border-radius:50%; border:1px solid rgba(255,255,255,.28);
+    background:rgba(255,255,255,.08); font-size:16px; cursor:pointer; color:var(--white);
+    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+  }
+  .settings-btn.active{background:var(--white); color:var(--ink); border-color:var(--white);}
+  .settings-btn:not(.active):hover{background:rgba(255,255,255,.16);}
+  .settings-btn:focus-visible{outline-color:var(--white);}
+
+  main{padding:16px 18px 8px; max-width:640px; margin:0 auto;}
+
+  .subtabs{
+    display:flex; gap:4px; margin-bottom:18px; background:var(--sand); padding:4px; border-radius:13px;
+  }
+  .subtabs button{
+    flex:1; border:none; background:none; padding:9px 4px; border-radius:10px;
+    font-size:13px; font-weight:600; color:var(--slate); cursor:pointer;
+  }
+  .subtabs button.active{background:var(--white); color:var(--ink); box-shadow:var(--shadow);}
+  .subtabs button:not(.active):hover{color:var(--ink);}
+
+  /* ---------- Week strip ---------- */
+  .week-nav{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
+  .week-nav .range{font-size:13px; color:var(--slate);}
+  .week-nav .arrows button{
+    width:32px; height:32px; border-radius:50%; border:1px solid var(--sand-line);
+    background:var(--white); font-size:16px; cursor:pointer; color:var(--ink);
+  }
+  .week-nav .arrows button:hover{border-color:var(--ink);}
+  .week-nav .arrows{display:flex; gap:6px;}
+
+  /* ---------- Shift cards ---------- */
+  .day-group{margin-bottom:22px;}
+  .day-group h3{
+    font-size:13px; font-weight:600; color:var(--slate); margin:0 0 8px;
+    font-family:'Inter'; text-transform:none;
+  }
+  .shift-card{
+    display:flex; gap:12px; background:var(--white); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:13px 14px; margin-bottom:9px; position:relative;
+    border-left:5px solid var(--teal);
+    transition:box-shadow .15s ease, transform .15s ease;
+  }
+  .shift-card.conflict{border-left-color:var(--coral); background:#FCF3F1;}
+  .shift-card .time-col{min-width:64px;}
+  .shift-card .time-col .t1{font-weight:700; font-size:14px;}
+  .shift-card .time-col .t2{font-size:12px; color:var(--slate);}
+  .shift-card .body{flex:1; min-width:0;}
+  .shift-card .clinic-name{font-weight:600; font-size:14.5px; margin-bottom:2px;}
+  .shift-card .meta{font-size:12.5px; color:var(--slate); display:flex; gap:8px; flex-wrap:wrap;}
+  .badge{
+    font-size:10.5px; font-weight:600; padding:2px 8px; border-radius:20px; display:inline-block;
+  }
+  .badge.confirmed{background:#E4F0EA; color:var(--teal-deep);}
+  .badge.pending{background:#FBF0DC; color:#8A6417;}
+  .badge.conflict{background:#FBE3DE; color:#A8402E;}
+  .shift-card .pay{font-weight:700; font-size:14px; white-space:nowrap;}
+  .shift-card .kebab{
+    position:absolute; top:10px; right:10px; border:none; background:none;
+    color:var(--slate); font-size:16px; cursor:pointer; padding:4px 6px;
+  }
+
+  .empty-state{
+    text-align:center; padding:52px 20px; color:var(--slate);
+  }
+  .empty-state .serif{font-size:19px; color:var(--ink); margin-bottom:6px;}
+  .empty-state p{font-size:13.5px; margin:0 0 16px;}
+  .empty-state button{
+    background:var(--teal); color:var(--white); border:none; padding:10px 20px;
+    border-radius:30px; font-size:13.5px; font-weight:600; cursor:pointer;
+  }
+
+  /* ---------- Month view ---------- */
+  .month-grid{
+    display:grid; grid-template-columns:repeat(7,1fr); gap:5px;
+  }
+  .month-grid .wd{font-size:10px; text-align:center; color:var(--slate); padding-bottom:4px;}
+  .month-cell{
+    aspect-ratio:1; border-radius:10px; background:var(--white); border:1px solid var(--sand-line);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    font-size:12.5px; cursor:pointer; position:relative; transition:border-color .15s ease, background-color .15s ease;
+  }
+  .month-cell:not(.selected-cell):hover{border-color:var(--teal);}
+  .month-cell.other-month{opacity:.35;}
+  .month-cell.today{border-color:var(--teal); color:var(--teal-deep); font-weight:700;}
+  .month-cell.selected-cell{background:var(--ink); border-color:var(--ink); color:var(--white);}
+  .month-cell .mdots{display:flex; gap:2px;}
+  .month-cell .mdots span{width:4.5px;height:4.5px;border-radius:50%;}
+  .month-summary{margin-top:20px; padding-top:16px; border-top:1px solid var(--sand-line);}
+  .month-summary .row{display:flex; justify-content:space-between; padding:9px 0; font-size:14px; border-bottom:1px solid var(--sand-line);}
+  .month-summary .row:last-child{border-bottom:none;}
+
+  /* ---------- Timetable (Emploi du temps) ---------- */
+  .slot-settings{margin-bottom:16px;}
+  .slot-settings .srow{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+  .slot-settings .srow .sdot{width:10px;height:10px;border-radius:50%; flex-shrink:0;}
+  .slot-settings .srow .sname{font-size:13px; font-weight:600; width:66px; flex-shrink:0;}
+  .slot-settings .srow input[type=time]{
+    flex:1; min-width:0; padding:7px 8px; border-radius:8px; border:1px solid var(--sand-line);
+    background:var(--white); font-size:12.5px; font-family:inherit;
+  }
+  .slot-settings .srow .sep{color:var(--slate); font-size:12px;}
+
+  .tt-wrap{overflow-x:auto; margin:0 -18px; padding:0 18px 4px;}
+  table.tt-table{border-collapse:separate; border-spacing:5px; width:100%; min-width:560px;}
+  table.tt-table th{
+    font-size:11px; font-weight:600; color:var(--slate); padding:0 0 4px; text-align:center;
+  }
+  table.tt-table th.slot-hd{text-align:left; min-width:64px;}
+  table.tt-table td.slot-label{font-size:11.5px; font-weight:600; color:var(--slate); white-space:nowrap; padding-right:6px;}
+  .tt-cell{
+    width:70px; height:52px; border-radius:11px; border:1.5px dashed var(--sand-line); background:var(--white);
+    cursor:pointer; display:flex; align-items:center; justify-content:center; text-align:center;
+    padding:4px; font-size:11px; font-weight:600; color:var(--slate); line-height:1.2;
+    transition:border-color .15s ease;
+  }
+  .tt-cell:not(.filled):hover{border-color:var(--teal); color:var(--teal-deep);}
+  .tt-cell.filled{border-style:solid; color:var(--white);}
+
+  .tt-legend{margin-top:18px; padding-top:14px; border-top:1px solid var(--sand-line); font-size:12.5px; color:var(--slate);}
+
+  /* ---------- Patients ---------- */
+  .search-input{
+    width:100%; padding:11px 14px; border-radius:12px; border:1px solid var(--sand-line);
+    background:var(--white); font-size:14px; margin-bottom:12px; font-family:inherit; color:var(--ink);
+  }
+  .patient-filter{display:flex; gap:6px; overflow-x:auto; margin-bottom:14px; padding-bottom:2px;}
+  .patient-filter button{
+    flex-shrink:0; padding:8px 14px; border-radius:20px; border:1px solid var(--sand-line);
+    background:var(--white); font-size:12.5px; font-weight:600; color:var(--slate); cursor:pointer;
+    display:flex; align-items:center; gap:6px;
+  }
+  .patient-filter button.active{background:var(--ink); color:var(--white); border-color:var(--ink);}
+  .patient-filter button:not(.active):hover{border-color:var(--teal); color:var(--teal-deep);}
+  .patient-filter button .fdot{width:8px;height:8px;border-radius:50%; flex-shrink:0;}
+  .balance-hero{
+    background:var(--ink); color:var(--white); border-radius:16px; padding:18px 20px; margin-bottom:16px;
+    display:flex; justify-content:space-between; align-items:flex-end;
+  }
+  .balance-hero .bh-block .label{font-size:11.5px; color:#AEB9C2; margin-bottom:4px; text-transform:uppercase; letter-spacing:.03em;}
+  .balance-hero .bh-block .amount{font-family:'Fraunces',serif; font-size:22px; font-weight:600;}
+  .balance-hero .bh-block.due .amount{color:#F0A98B;}
+  .balance-hero .bh-block.collected .amount{color:#8FD6BE;}
+  .patient-card{align-items:flex-start;}
+  .patient-card .info{flex:1; min-width:0;}
+  .patient-card .sub.last-visit{opacity:.75; margin-top:1px;}
+  .patient-card .pc-right{display:flex; flex-direction:column; align-items:flex-end; gap:8px; flex-shrink:0;}
+  .patient-card .balance{font-size:12px; text-align:right; white-space:nowrap;}
+  .patient-card .balance .paid{color:var(--teal-deep); font-weight:600;}
+  .patient-card .balance .due{color:var(--coral); font-weight:600; display:block; margin-top:2px;}
+  .patient-card .qa{display:flex; gap:6px;}
+  .patient-card .qa button{
+    width:30px; height:30px; border-radius:50%; border:1px solid var(--sand-line); background:var(--white);
+    font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--ink);
+  }
+  .patient-card .qa button:hover{border-color:var(--ink);}
+  .patient-card .qa button.wa{color:#1F9E5A; border-color:#bfe9d0;}
+  .patient-card .qa button.wa:hover{border-color:#1F9E5A;}
+  .payment-totals .row{display:flex; justify-content:space-between; padding:8px 0; font-size:13.5px; border-bottom:1px solid var(--sand-line);}
+  .payment-totals .row:last-child{border-bottom:none;}
+
+  /* ---------- Clinics ---------- */
+  .clinic-card{
+    display:flex; align-items:center; gap:12px; background:var(--white); border-radius:var(--radius);
+    box-shadow:var(--shadow); padding:13px 14px; margin-bottom:9px; cursor:pointer;
+    transition:box-shadow .15s ease, transform .15s ease;
+  }
+  .clinic-card:hover{box-shadow:0 2px 4px rgba(22,35,46,.08), 0 8px 20px rgba(22,35,46,.1); transform:translateY(-1px);}
+  .profile-card{cursor:default;}
+  .profile-card:hover{transform:none; box-shadow:var(--shadow);}
+  .clinic-dot{width:14px;height:14px;border-radius:50%; flex-shrink:0;}
+  .clinic-card .info{flex:1; min-width:0;}
+  .clinic-card .info .name{font-weight:600; font-size:14.5px;}
+  .clinic-card .info .sub{font-size:12.5px; color:var(--slate); margin-top:2px;}
+  .clinic-card .rate{font-size:13px; color:var(--slate); text-align:right;}
+
+  .add-clinic-btn{
+    width:100%; padding:13px; border-radius:var(--radius); border:1.5px dashed var(--sand-line);
+    background:none; color:var(--slate); font-size:14px; font-weight:600; cursor:pointer; margin-top:6px;
+  }
+  .add-clinic-btn:hover{border-color:var(--teal); color:var(--teal-deep);}
+
+  .btn-outline{
+    width:100%; padding:11px; border-radius:12px; border:1.5px solid var(--teal);
+    background:none; color:var(--teal-deep); font-size:13.5px; font-weight:600; cursor:pointer; margin-top:2px;
+  }
+  .btn-outline:hover{background:rgba(47,111,98,.08);}
+
+  /* ---------- Earnings ---------- */
+  .earnings-hero{
+    background:var(--ink); color:var(--white); border-radius:18px; padding:22px 20px; margin-bottom:18px;
+  }
+  .earnings-hero .label{font-size:12.5px; color:#B9C2C9; margin-bottom:6px;}
+  .earnings-hero .amount{font-family:'Fraunces',serif; font-size:36px; font-weight:600;}
+  .earnings-hero .sub{font-size:12.5px; color:#B9C2C9; margin-top:6px;}
+  .earnings-toggle{display:flex; gap:6px; margin-bottom:14px;}
+  .earnings-toggle button{
+    flex:1; padding:8px; border-radius:10px; border:1px solid var(--sand-line); background:var(--white);
+    font-size:13px; font-weight:600; color:var(--slate); cursor:pointer;
+  }
+  .earnings-toggle button.active{background:var(--ink); color:var(--white); border-color:var(--ink);}
+  .earnings-toggle button:not(.active):hover{border-color:var(--ink); color:var(--ink);}
+  .bar-row{margin-bottom:14px;}
+  .bar-row .top{display:flex; justify-content:space-between; font-size:13px; margin-bottom:5px;}
+  .bar-row .top .n{font-weight:600;}
+  .bar-track{height:9px; background:var(--sand); border-radius:6px; overflow:hidden;}
+  .bar-fill{height:100%; border-radius:6px;}
+
+  /* ---------- FAB ---------- */
+  .fab{
+    position:fixed; right:20px; bottom:88px; width:56px; height:56px; border-radius:50%;
+    background:var(--teal); color:var(--white); font-size:26px; border:none; cursor:pointer;
+    box-shadow:0 6px 18px rgba(47,111,98,.4); display:flex; align-items:center; justify-content:center;
+    z-index:20; transition:box-shadow .15s ease, transform .1s ease;
+  }
+  .fab:hover{box-shadow:0 8px 22px rgba(47,111,98,.5);}
+
+  /* ---------- Modal ---------- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(22,35,46,.42); display:none;
+    align-items:flex-end; justify-content:center; z-index:50;
+    backdrop-filter:blur(2px); -webkit-backdrop-filter:blur(2px);
+  }
+  .overlay.open{display:flex; animation:fadeIn .15s ease-out;}
+  @keyframes fadeIn{from{opacity:0;} to{opacity:1;}}
+  .sheet{
+    background:var(--paper); width:100%; max-width:640px; border-radius:20px 20px 0 0;
+    padding:18px 18px 26px; max-height:88vh; overflow-y:auto;
+    animation:slideUp .22s ease-out;
+  }
+  @keyframes slideUp{from{transform:translateY(24px); opacity:0;} to{transform:translateY(0); opacity:1;}}
+  .sheet-handle{width:36px; height:4px; background:var(--sand-line); border-radius:4px; margin:0 auto 14px;}
+  .sheet h2{font-size:19px; margin:0 0 16px; font-weight:600;}
+  .field{margin-bottom:13px;}
+  .field label{display:block; font-size:12.5px; color:var(--slate); margin-bottom:5px; font-weight:600;}
+  .field input, .field select, .field textarea{
+    width:100%; padding:11px 12px; border-radius:10px; border:1px solid var(--sand-line);
+    background:var(--white); font-size:14.5px; font-family:inherit; color:var(--ink);
+  }
+  .field textarea{resize:vertical; min-height:56px;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .field.color-field{display:flex; align-items:center; gap:10px;}
+  .field.color-field input[type=color]{width:44px; height:38px; padding:2px; flex-shrink:0;}
+  .rate-toggle{display:flex; gap:6px; margin-bottom:13px;}
+  .rate-toggle button{
+    flex:1; padding:9px; border-radius:9px; border:1px solid var(--sand-line); background:var(--white);
+    font-size:13px; font-weight:600; cursor:pointer; color:var(--slate);
+  }
+  .rate-toggle button.active{background:var(--teal); color:var(--white); border-color:var(--teal);}
+  .rate-toggle button:not(.active):hover{border-color:var(--teal); color:var(--teal-deep);}
+  .sheet-actions{display:flex; gap:10px; margin-top:6px;}
+  .sheet-actions button{
+    flex:1; padding:13px; border-radius:12px; border:none; font-size:14.5px; font-weight:600; cursor:pointer;
+  }
+  .btn-primary{background:var(--teal); color:var(--white);}
+  .btn-primary:hover{background:var(--teal-deep);}
+  .btn-danger{background:none; color:var(--coral); border:1px solid #F0C9C1 !important;}
+  .btn-danger:hover{background:#FBE3DE;}
+  .btn-ghost{background:none; color:var(--slate); border:1px solid var(--sand-line) !important;}
+  .btn-ghost:hover{border-color:var(--slate) !important; color:var(--ink);}
+  .conflict-warn{
+    background:#FBE3DE; color:#A8402E; font-size:12.5px; padding:9px 11px; border-radius:9px; margin-bottom:13px;
+  }
+
+  /* ---------- Bottom bar ---------- */
+  .bottombar{
+    position:fixed; bottom:0; left:0; right:0; background:var(--white); border-top:1px solid var(--sand-line);
+    display:flex; z-index:15; padding-bottom:env(safe-area-inset-bottom);
+  }
+  .bottombar button{
+    flex:1; background:none; border:none; padding:11px 4px 9px; font-size:11px; color:var(--slate); cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; gap:3px; font-weight:600;
+  }
+  .bottombar button:not(.active):hover{color:var(--ink);}
+  .bottombar button .ic{font-size:18px;}
+  .bottombar button.active{color:var(--teal);}
+
+  @media (min-width:520px){
+    .fab{right:calc(50% - 260px + 20px);}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar-brand">DentaBay</div>
+  <div class="topbar-income">
+    <span class="tb-label">This month</span>
+    <span class="tb-amount" id="headerIncome">0 DA</span>
+  </div>
+  <button class="settings-btn" id="settingsBtn" title="Clinics &amp; settings">⚙</button>
+</header>
+<div id="monthLabel" style="display:none;"></div>
+
+<main id="main"></main>
+
+<button class="fab" id="fabAdd" title="Add shift">+</button>
+
+<nav class="bottombar">
+  <button data-view="schedule" class="active"><span class="ic">▥</span>Work schedule</button>
+  <button data-view="patients"><span class="ic">◐</span>Patients</button>
+  <button data-view="earnings"><span class="ic">◈</span>Earnings</button>
+</nav>
+
+<!-- Shift modal -->
+<div class="overlay" id="shiftOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2 id="shiftModalTitle">New shift</h2>
+    <div id="shiftConflictWarn"></div>
+    <div class="field">
+      <label>Clinic</label>
+      <select id="f_clinic"></select>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="f_date">
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select id="f_status">
+          <option value="confirmed">Confirmed</option>
+          <option value="pending">Pending</option>
+        </select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label>Starts</label>
+        <input type="time" id="f_start">
+      </div>
+      <div class="field">
+        <label>Ends</label>
+        <input type="time" id="f_end">
+      </div>
+    </div>
+    <div class="field">
+      <label>Pay for this shift (DA)</label>
+      <input type="number" id="f_pay" min="0" step="100">
+    </div>
+    <div class="field">
+      <label>Notes (optional)</label>
+      <textarea id="f_notes" placeholder="e.g. bring your own loupes, cover for Dr. Amrani's extractions"></textarea>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-ghost" id="shiftCancel">Cancel</button>
+      <button class="btn-danger" id="shiftDelete" style="display:none;">Delete</button>
+      <button class="btn-primary" id="shiftSave">Save shift</button>
+    </div>
+  </div>
+</div>
+
+<!-- Clinic modal -->
+<div class="overlay" id="clinicOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2 id="clinicModalTitle">New clinic</h2>
+    <div class="field color-field">
+      <input type="color" id="c_color" value="#2F6F62">
+      <input type="text" id="c_name" placeholder="Clinic or dentist's name" style="flex:1;">
+    </div>
+    <div class="field">
+      <label>Address (optional)</label>
+      <input type="text" id="c_address" placeholder="Street, city">
+    </div>
+    <div class="field">
+      <label>Contact (optional)</label>
+      <input type="text" id="c_contact" placeholder="Phone or name to reach">
+    </div>
+    <div class="rate-toggle">
+      <button data-rate="hourly" class="active">Hourly rate</button>
+      <button data-rate="flat">Flat per shift</button>
+    </div>
+    <div class="field">
+      <label id="c_rateLabel">Rate per hour (DA)</label>
+      <input type="number" id="c_rate" min="0" step="100">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-ghost" id="clinicCancel">Cancel</button>
+      <button class="btn-danger" id="clinicDelete" style="display:none;">Delete</button>
+      <button class="btn-primary" id="clinicSave">Save clinic</button>
+    </div>
+  </div>
+</div>
+
+<!-- Timetable slot modal -->
+<div class="overlay" id="slotOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2 id="slotModalTitle">Assign clinic</h2>
+    <div id="slotClinicList"></div>
+    <div class="sheet-actions">
+      <button class="btn-ghost" id="slotCancel">Cancel</button>
+      <button class="btn-danger" id="slotClear">Clear slot</button>
+    </div>
+  </div>
+</div>
+
+<!-- Patient modal -->
+<div class="overlay" id="patientOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2 id="patientModalTitle">New patient</h2>
+    <div class="field">
+      <label>Clinic</label>
+      <select id="p_clinic"></select>
+    </div>
+    <div class="field">
+      <label>Patient name</label>
+      <input type="text" id="p_name" placeholder="Full name">
+    </div>
+    <div class="field">
+      <label>Phone (optional)</label>
+      <input type="text" id="p_phone" placeholder="Phone number">
+    </div>
+    <div class="field">
+      <label>Treatment type</label>
+      <select id="p_treatment">
+        <option value="Consultation">Consultation</option>
+        <option value="Scaling (détartrage)">Scaling (détartrage)</option>
+        <option value="Filling (carie)">Filling (carie)</option>
+        <option value="Root canal (endo)">Root canal (endo)</option>
+        <option value="Extraction">Extraction</option>
+        <option value="Crown / bridge (prothèse)">Crown / bridge (prothèse)</option>
+        <option value="Orthodontics">Orthodontics</option>
+        <option value="Surgery">Surgery</option>
+        <option value="Whitening">Whitening</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Notes (optional)</label>
+      <textarea id="p_notes" placeholder="Treatment plan, allergies, anything worth remembering"></textarea>
+    </div>
+    <div id="patientPaymentsSection">
+      <div class="field" style="margin-bottom:8px;">
+        <label>Payments</label>
+      </div>
+      <div id="paymentsList"></div>
+      <button class="btn-outline" id="addPaymentBtn">+ Add payment</button>
+      <div class="payment-totals" id="patientTotals" style="margin-top:12px;"></div>
+    </div>
+    <div class="sheet-actions" style="margin-top:16px;">
+      <button class="btn-ghost" id="patientCancel">Cancel</button>
+      <button class="btn-danger" id="patientDelete" style="display:none;">Delete</button>
+      <button class="btn-primary" id="patientSave">Save patient</button>
+    </div>
+  </div>
+</div>
+
+<!-- Payment modal -->
+<div class="overlay" id="paymentOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>Add payment</h2>
+    <div class="row2">
+      <div class="field">
+        <label>Amount (DA)</label>
+        <input type="number" id="pay_amount" min="0" step="100">
+      </div>
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="pay_date">
+      </div>
+    </div>
+    <div class="field">
+      <label>Status</label>
+      <select id="pay_status">
+        <option value="paid">Paid</option>
+        <option value="pending">Pending</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Treatment</label>
+      <select id="pay_treatment">
+        <option value="Consultation">Consultation</option>
+        <option value="Scaling (détartrage)">Scaling (détartrage)</option>
+        <option value="Filling (carie)">Filling (carie)</option>
+        <option value="Root canal (endo)">Root canal (endo)</option>
+        <option value="Extraction">Extraction</option>
+        <option value="Crown / bridge (prothèse)">Crown / bridge (prothèse)</option>
+        <option value="Orthodontics">Orthodontics</option>
+        <option value="Surgery">Surgery</option>
+        <option value="Whitening">Whitening</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Note (optional)</label>
+      <input type="text" id="pay_note" placeholder="e.g. tooth #36, 2nd session, deposit">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-ghost" id="paymentCancel">Cancel</button>
+      <button class="btn-primary" id="paymentSave">Save payment</button>
+    </div>
+  </div>
+</div>
+
+<!-- Doctor profile / onboarding modal -->
+<div class="overlay" id="doctorOverlay">
+  <div class="sheet">
+    <div class="sheet-handle" id="doctorHandle"></div>
+    <h2 id="doctorModalTitle">Welcome to DentaBay</h2>
+    <p id="doctorIntro" style="font-size:13px; color:var(--slate); margin:-8px 0 16px;">A few details before you get started.</p>
+    <div class="field">
+      <label>Full name</label>
+      <input type="text" id="d_name" placeholder="Dr. ...">
+    </div>
+    <div class="field">
+      <label>Specialty / title (optional)</label>
+      <input type="text" id="d_specialty" placeholder="e.g. General Dentist">
+    </div>
+    <div class="field">
+      <label>Phone (optional)</label>
+      <input type="text" id="d_phone" placeholder="Phone number">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-ghost" id="doctorCancel">Cancel</button>
+      <button class="btn-primary" id="doctorSave">Get started</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- State ---------------- */
+  var STORE_KEY = "locum_planner_v1";
+  var PALETTE = ["#2F6F62","#C79A3F","#7A5FB0","#3B6FA0","#B0555F","#4E8B6E","#A16A3D"];
+  var state = load() || { clinics: [], shifts: [], timetable: {}, slotTimes: {
+      morning:{start:"08:00",end:"12:00"},
+      afternoon:{start:"12:00",end:"17:00"},
+      evening:{start:"17:00",end:"20:00"}
+    }, recurringSkips: [], patients: [] };
+  if(!state.timetable) state.timetable = {};
+  if(!state.slotTimes) state.slotTimes = {
+    morning:{start:"08:00",end:"12:00"},
+    afternoon:{start:"12:00",end:"17:00"},
+    evening:{start:"17:00",end:"20:00"}
+  };
+  if(!state.recurringSkips) state.recurringSkips = [];
+  if(!state.patients) state.patients = [];
+  if(state.doctorProfile===undefined) state.doctorProfile = null;
+  var patientFilter = "all";
+  var patientSearch = "";
+  var editingPatientId = null;
+  var currentPatientDraft = null;
+  var isExistingPatient = false;
+  var isOnboarding = false;
+  var SLOTS = ["morning","afternoon","evening"];
+  var SLOT_LABELS = {morning:"Morning", afternoon:"Afternoon", evening:"Evening"};
+  var DAY_ORDER = [1,2,3,4,5,6,0]; // Mon..Sun for the timetable grid
+  var DAY_LABELS = {0:"Sun",1:"Mon",2:"Tue",3:"Wed",4:"Thu",5:"Fri",6:"Sat"};
+  var activeSlotKey = null; // {day, slot}
+  var view = "schedule";
+  var scheduleTab = "timetable";
+  var selectedDate = todayISO();
+  var monthAnchor = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  var earningsScope = "month";
+  var editingShiftId = null;
+  var editingClinicId = null;
+  var rateMode = "hourly";
+
+  function load(){
+    try{
+      var raw = localStorage.getItem(STORE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+  function save(){
+    try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+  }
+  function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+  /* ---------------- Date helpers ---------------- */
+  function pad(n){ return n<10 ? "0"+n : ""+n; }
+  function toISO(d){ return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate()); }
+  function todayISO(){ return toISO(new Date()); }
+  function fromISO(s){ var p=s.split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
+  function startOfWeek(d){
+    var x = new Date(d); var day = x.getDay(); // 0 = Sunday
+    x.setDate(x.getDate()-day); x.setHours(0,0,0,0); return x;
+  }
+  function addDays(d,n){ var x=new Date(d); x.setDate(x.getDate()+n); return x; }
+  function dayName(d){ return ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()]; }
+  function monthName(d){ return d.toLocaleString('en-US',{month:'long'}); }
+  function fmtTime(t){
+    if(!t) return "";
+    var p=t.split(":"); var h=+p[0]; var m=p[1];
+    var suf = h>=12 ? "pm":"am"; var h12 = h%12; if(h12===0) h12=12;
+    return h12+":"+m+suf;
+  }
+  function fmtMoney(n){
+    n = Math.round(n||0);
+    return n.toLocaleString('en-US')+" DA";
+  }
+
+  /* ---------------- Clinic helpers ---------------- */
+  function getClinic(id){ return state.clinics.find(function(c){return c.id===id;}); }
+  function nextPaletteColor(){
+    return PALETTE[state.clinics.length % PALETTE.length];
+  }
+
+  /* ---------------- Conflict detection ---------------- */
+  function timeToMin(t){ var p=t.split(":"); return (+p[0])*60 + (+p[1]); }
+  function computePay(clinic, start, end){
+    if(!clinic) return 0;
+    if(clinic.rateType==='flat') return +clinic.rate||0;
+    var mins = timeToMin(end)-timeToMin(start);
+    return mins>0 ? Math.round((+clinic.rate||0) * (mins/60)) : 0;
+  }
+  function overlaps(a,b){
+    if(a.date!==b.date) return false;
+    var as=timeToMin(a.start), ae=timeToMin(a.end), bs=timeToMin(b.start), be=timeToMin(b.end);
+    return as < be && bs < ae;
+  }
+  function conflictsFor(shift){
+    return state.shifts.filter(function(s){ return s.id!==shift.id && overlaps(s,shift); });
+  }
+  function shiftsOnDate(iso){
+    return state.shifts.filter(function(s){return s.date===iso;}).sort(function(a,b){return a.start.localeCompare(b.start);});
+  }
+
+  /* ---------------- Recurring timetable engine ---------------- */
+  var RECUR_WEEKS_AHEAD = 8;
+  function skipKey(dateISO, slot){ return dateISO+"|"+slot; }
+  function isSkipped(dateISO, slot){ return state.recurringSkips.indexOf(skipKey(dateISO,slot))!==-1; }
+
+  function generateRecurringShifts(){
+    var today = new Date(); today.setHours(0,0,0,0);
+    var changed = false;
+    for(var i=0;i<RECUR_WEEKS_AHEAD*7;i++){
+      var d = addDays(today,i);
+      var iso = toISO(d);
+      var wd = d.getDay();
+      var dayRow = state.timetable[wd];
+      if(!dayRow) continue;
+      SLOTS.forEach(function(slot){
+        var clinicId = dayRow[slot];
+        if(!clinicId) return;
+        var clinic = getClinic(clinicId);
+        if(!clinic) return;
+        if(isSkipped(iso, slot)) return;
+        var already = state.shifts.some(function(s){ return s.date===iso && s.recurringSlot===slot; });
+        if(already) return;
+        var times = state.slotTimes[slot];
+        state.shifts.push({
+          id: uid(),
+          clinicId: clinicId,
+          date: iso,
+          start: times.start,
+          end: times.end,
+          status: "confirmed",
+          pay: computePay(clinic, times.start, times.end),
+          notes: "",
+          recurringGenerated: true,
+          recurringSlot: slot
+        });
+        changed = true;
+      });
+    }
+    if(changed) save();
+  }
+
+  function clearFutureGenerated(weekday, slot){
+    var todayIso = todayISO();
+    var toRemove = state.shifts.filter(function(s){
+      return s.recurringGenerated && s.recurringSlot===slot && s.date>=todayIso && fromISO(s.date).getDay()===weekday;
+    });
+    if(toRemove.length===0) return;
+    if(!confirm("Remove "+toRemove.length+" upcoming shift"+(toRemove.length===1?"":"s")+" generated from this slot?")) return;
+    var removeIds = toRemove.map(function(s){return s.id;});
+    state.shifts = state.shifts.filter(function(s){ return removeIds.indexOf(s.id)===-1; });
+    save();
+  }
+
+  /* ---------------- Render root ---------------- */
+  function updateHeaderIncome(){
+    var now = new Date();
+    var total = state.shifts.filter(function(s){
+      var d = fromISO(s.date);
+      return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && s.status==='confirmed';
+    }).reduce(function(a,s){ return a+(+s.pay||0); },0);
+    document.getElementById('headerIncome').textContent = fmtMoney(total);
+  }
+
+  function render(){
+    updateHeaderIncome();
+    document.querySelectorAll('.bottombar button').forEach(function(b){
+      b.classList.toggle('active', b.dataset.view===view);
+    });
+    document.getElementById('settingsBtn').classList.toggle('active', view==='clinics');
+    var main = document.getElementById('main');
+    document.getElementById('monthLabel').textContent = "";
+    if(view==="schedule"){ renderSchedule(main); }
+    else if(view==="patients"){ renderPatients(main); }
+    else if(view==="clinics"){ renderClinics(main); }
+    else if(view==="earnings"){ renderEarnings(main); }
+  }
+
+  /* ---------------- Work schedule (Emploi + Calendar combined) ---------------- */
+  function renderSchedule(main){
+    var html = '<div class="subtabs">'+
+      '<button data-stab="timetable" class="'+(scheduleTab==='timetable'?'active':'')+'">Emploi</button>'+
+      '<button data-stab="calendar" class="'+(scheduleTab==='calendar'?'active':'')+'">Calendar</button>'+
+      '</div><div id="scheduleContent"></div>';
+    main.innerHTML = html;
+    document.querySelectorAll('.subtabs button').forEach(function(b){
+      b.onclick = function(){ scheduleTab = b.dataset.stab; render(); };
+    });
+    var content = document.getElementById('scheduleContent');
+    if(scheduleTab==='timetable') renderTimetable(content);
+    else renderCalendar(content);
+  }
+
+  function shiftCardHTML(s){
+    var c = getClinic(s.clinicId);
+    var color = c ? c.color : '#999';
+    var conflict = conflictsFor(s).length>0;
+    var badge = conflict ? '<span class="badge conflict">Overlap</span>' :
+      (s.status==='confirmed' ? '<span class="badge confirmed">Confirmed</span>' : '<span class="badge pending">Pending</span>');
+    return '<div class="shift-card'+(conflict?' conflict':'')+'" data-id="'+s.id+'" style="border-left-color:'+(conflict?'':color)+'">'+
+      '<div class="time-col"><div class="t1">'+fmtTime(s.start)+'</div><div class="t2">'+fmtTime(s.end)+'</div></div>'+
+      '<div class="body">'+
+        '<div class="clinic-name">'+(s.recurringGenerated?'↻ ':'')+(c?escapeHTML(c.name):'Unknown clinic')+'</div>'+
+        '<div class="meta">'+badge+(s.notes?'<span>'+escapeHTML(s.notes)+'</span>':'')+'</div>'+
+      '</div>'+
+      '<div class="pay">'+fmtMoney(s.pay)+'</div>'+
+    '</div>';
+  }
+
+  function escapeHTML(s){
+    return (s||"").replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  /* ---------------- Calendar view (month grid + day agenda) ---------------- */
+  function renderCalendar(main){
+    document.getElementById('monthLabel').textContent = monthName(monthAnchor)+" "+monthAnchor.getFullYear();
+    var html = '<div class="week-nav"><span class="range">'+monthName(monthAnchor)+' '+monthAnchor.getFullYear()+'</span>'+
+      '<span class="arrows"><button id="monthPrev">‹</button><button id="monthNext">›</button></span></div>';
+
+    html += '<div class="month-grid">';
+    ["Su","Mo","Tu","We","Th","Fr","Sa"].forEach(function(d){ html += '<div class="wd">'+d+'</div>'; });
+
+    var firstOfMonth = new Date(monthAnchor.getFullYear(), monthAnchor.getMonth(), 1);
+    var gridStart = startOfWeek(firstOfMonth);
+    var cells = [];
+    for(var i=0;i<42;i++) cells.push(addDays(gridStart,i));
+    var lastCellUsed = 34;
+    for(i=41;i>=28;i--){ if(cells[i].getMonth()===monthAnchor.getMonth()){ lastCellUsed = i; break; } }
+
+    cells.slice(0, lastCellUsed+1).forEach(function(d){
+      var iso = toISO(d);
+      var otherMonth = d.getMonth()!==monthAnchor.getMonth();
+      var isToday = iso===todayISO();
+      var isSel = iso===selectedDate;
+      var list = shiftsOnDate(iso);
+      html += '<div class="month-cell'+(otherMonth?' other-month':'')+(isToday?' today':'')+(isSel?' selected-cell':'')+'" data-date="'+iso+'">'+d.getDate();
+      if(list.length){
+        html += '<div class="mdots">';
+        list.slice(0,4).forEach(function(s){ var c=getClinic(s.clinicId); html+='<span style="background:'+(c?c.color:'#999')+'"></span>'; });
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+
+    // day agenda for the selected date
+    var agendaDate = fromISO(selectedDate);
+    var agendaList = shiftsOnDate(selectedDate);
+    html += '<div class="day-group" style="margin-top:20px;"><h3>'+dayName(agendaDate)+', '+monthName(agendaDate)+' '+agendaDate.getDate()+'</h3>';
+    if(agendaList.length===0){
+      html += '<div class="empty-state" style="padding:28px 12px;"><p>No shifts on this day.</p>'+
+        (state.clinics.length===0 ? '<button id="emptyAddClinic">Add your first clinic</button>' : '<button id="emptyAddShift">Add a shift</button>')+
+        '</div>';
+    } else {
+      agendaList.forEach(function(s){ html += shiftCardHTML(s); });
+    }
+    html += '</div>';
+
+    // month summary
+    var monthShifts = state.shifts.filter(function(s){
+      var d = fromISO(s.date);
+      return d.getFullYear()===monthAnchor.getFullYear() && d.getMonth()===monthAnchor.getMonth();
+    });
+    var confirmedCount = monthShifts.filter(function(s){return s.status==='confirmed';}).length;
+    var totalEarn = monthShifts.reduce(function(a,s){return a+(+s.pay||0);},0);
+    html += '<div class="month-summary">'+
+      '<div class="row"><span>Shifts this month</span><span>'+monthShifts.length+'</span></div>'+
+      '<div class="row"><span>Confirmed</span><span>'+confirmedCount+' of '+monthShifts.length+'</span></div>'+
+      '<div class="row"><span>Expected earnings</span><span>'+fmtMoney(totalEarn)+'</span></div>'+
+      '</div>';
+
+    main.innerHTML = html;
+    document.getElementById('monthPrev').onclick=function(){ monthAnchor=new Date(monthAnchor.getFullYear(),monthAnchor.getMonth()-1,1); render(); };
+    document.getElementById('monthNext').onclick=function(){ monthAnchor=new Date(monthAnchor.getFullYear(),monthAnchor.getMonth()+1,1); render(); };
+    document.querySelectorAll('.month-cell').forEach(function(el){
+      el.onclick = function(){ selectedDate = el.dataset.date; render(); };
+    });
+    document.querySelectorAll('.shift-card').forEach(function(el){
+      el.onclick = function(e){ if(e.target.classList.contains('kebab')) return; openShiftModal(el.dataset.id); };
+    });
+    var eb = document.getElementById('emptyAddShift'); if(eb) eb.onclick=function(){openShiftModal(null, selectedDate);};
+    var ec = document.getElementById('emptyAddClinic'); if(ec) ec.onclick=function(){openClinicModal(null);};
+  }
+
+  /* ---------------- Timetable view (Emploi du temps) ---------------- */
+  function renderTimetable(main){
+    document.getElementById('monthLabel').textContent = "Your standing week";
+    var html = "";
+    if(state.clinics.length===0){
+      html += '<div class="empty-state"><div class="serif">Add a clinic first</div>'+
+        '<p>Once you have clinics saved, you can drop them into your recurring week here.</p>'+
+        '<button id="ttEmptyAddClinic">Add a clinic</button></div>';
+      main.innerHTML = html;
+      document.getElementById('ttEmptyAddClinic').onclick = function(){ openClinicModal(null); };
+      return;
+    }
+
+    html += '<div class="slot-settings">';
+    SLOTS.forEach(function(slot){
+      var t = state.slotTimes[slot];
+      html += '<div class="srow"><span class="sname">'+SLOT_LABELS[slot]+'</span>'+
+        '<input type="time" data-slot="'+slot+'" data-edge="start" value="'+t.start+'">'+
+        '<span class="sep">–</span>'+
+        '<input type="time" data-slot="'+slot+'" data-edge="end" value="'+t.end+'"></div>';
+    });
+    html += '</div>';
+
+    html += '<div class="tt-wrap"><table class="tt-table"><thead><tr><th class="slot-hd"></th>';
+    DAY_ORDER.forEach(function(wd){ html += '<th>'+DAY_LABELS[wd]+'</th>'; });
+    html += '</tr></thead><tbody>';
+
+    SLOTS.forEach(function(slot){
+      html += '<tr><td class="slot-label">'+SLOT_LABELS[slot]+'</td>';
+      DAY_ORDER.forEach(function(wd){
+        var dayRow = state.timetable[wd] || {};
+        var clinicId = dayRow[slot];
+        var c = clinicId ? getClinic(clinicId) : null;
+        if(c){
+          html += '<td><div class="tt-cell filled" style="background:'+c.color+'; border-color:'+c.color+'" data-day="'+wd+'" data-slot="'+slot+'">'+escapeHTML(c.name.split(' ')[0])+'</div></td>';
+        } else {
+          html += '<td><div class="tt-cell" data-day="'+wd+'" data-slot="'+slot+'">+</div></td>';
+        }
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+
+    html += '<div class="tt-legend">Tap a slot to assign a clinic. Filled slots automatically create shifts on your Week and Month calendars for the next '+RECUR_WEEKS_AHEAD+' weeks.</div>';
+
+    main.innerHTML = html;
+
+    document.querySelectorAll('.slot-settings input[type=time]').forEach(function(inp){
+      inp.onchange = function(){
+        var slot = inp.dataset.slot, edge = inp.dataset.edge;
+        state.slotTimes[slot][edge] = inp.value;
+        save();
+        generateRecurringShifts();
+        render();
+      };
+    });
+
+    document.querySelectorAll('.tt-cell').forEach(function(el){
+      el.onclick = function(){ openSlotModal(+el.dataset.day, el.dataset.slot); };
+    });
+  }
+
+  function openSlotModal(day, slot){
+    activeSlotKey = {day:day, slot:slot};
+    document.getElementById('slotModalTitle').textContent = DAY_LABELS[day]+" "+SLOT_LABELS[slot].toLowerCase();
+    var list = document.getElementById('slotClinicList');
+    var current = (state.timetable[day]||{})[slot];
+    list.innerHTML = state.clinics.map(function(c){
+      return '<div class="clinic-card" data-clinic="'+c.id+'" style="'+(current===c.id?'outline:2px solid '+c.color+';':'')+'">'+
+        '<span class="clinic-dot" style="background:'+c.color+'"></span>'+
+        '<div class="info"><div class="name">'+escapeHTML(c.name)+'</div></div>'+
+      '</div>';
+    }).join('');
+    document.querySelectorAll('#slotClinicList .clinic-card').forEach(function(el){
+      el.onclick = function(){ assignSlot(el.dataset.clinic); };
+    });
+    document.getElementById('slotOverlay').classList.add('open');
+  }
+  function closeSlotModal(){ document.getElementById('slotOverlay').classList.remove('open'); activeSlotKey=null; }
+
+  function assignSlot(clinicId){
+    if(!activeSlotKey) return;
+    var day = activeSlotKey.day, slot = activeSlotKey.slot;
+    if(!state.timetable[day]) state.timetable[day] = {};
+    state.timetable[day][slot] = clinicId;
+    save();
+    closeSlotModal();
+    generateRecurringShifts();
+    render();
+  }
+
+  function clearSlot(){
+    if(!activeSlotKey) return;
+    var day = activeSlotKey.day, slot = activeSlotKey.slot;
+    if(state.timetable[day]) state.timetable[day][slot] = null;
+    save();
+    clearFutureGenerated(day, slot);
+    closeSlotModal();
+    render();
+  }
+
+  /* ---------------- Patients view ---------------- */
+  function patientTotals(p){
+    var paid = p.payments.filter(function(x){return x.status==='paid';}).reduce(function(a,x){return a+(+x.amount||0);},0);
+    var pending = p.payments.filter(function(x){return x.status==='pending';}).reduce(function(a,x){return a+(+x.amount||0);},0);
+    return {paid:paid, pending:pending};
+  }
+  function lastVisitDate(p){
+    if(!p.payments.length) return null;
+    return p.payments.reduce(function(latest,pay){ return (!latest || pay.date>latest) ? pay.date : latest; }, null);
+  }
+  function phoneDigits(phone){ return (phone||"").replace(/[^\d+]/g,''); }
+  function telLink(phone){ return 'tel:'+phoneDigits(phone); }
+  function waLink(phone){
+    var d = phoneDigits(phone).replace(/^\+/,'');
+    if(d.charAt(0)==='0') d = '213'+d.slice(1);
+    return 'https://wa.me/'+d;
+  }
+
+  function renderPatients(main){
+    document.getElementById('monthLabel').textContent = "";
+    if(state.clinics.length===0){
+      main.innerHTML = '<div class="empty-state"><div class="serif">Add a clinic first</div>'+
+        '<p>Patients are grouped by clinic, so add your clinics before adding patients.</p>'+
+        '<button id="ptEmptyAddClinic">Add a clinic</button></div>';
+      document.getElementById('ptEmptyAddClinic').onclick = function(){ openClinicModal(null); };
+      return;
+    }
+
+    var html = '<input type="text" class="search-input" id="patientSearchInput" placeholder="Search patients by name" value="'+escapeHTML(patientSearch)+'">';
+
+    html += '<div class="patient-filter">';
+    html += '<button data-filter="all" class="'+(patientFilter==='all'?'active':'')+'">All clinics</button>';
+    state.clinics.forEach(function(c){
+      html += '<button data-filter="'+c.id+'" class="'+(patientFilter===c.id?'active':'')+'"><span class="fdot" style="background:'+c.color+'"></span>'+escapeHTML(c.name)+'</button>';
+    });
+    html += '</div>';
+
+    var list = state.patients.filter(function(p){
+      var matchesClinic = patientFilter==='all' || p.clinicId===patientFilter;
+      var matchesSearch = !patientSearch || p.name.toLowerCase().indexOf(patientSearch.toLowerCase())!==-1;
+      return matchesClinic && matchesSearch;
+    }).sort(function(a,b){ return a.name.localeCompare(b.name); });
+
+    var totalDue = 0, totalPaid = 0;
+    list.forEach(function(p){ var t = patientTotals(p); totalDue += t.pending; totalPaid += t.paid; });
+    html += '<div class="balance-hero">'+
+      '<div class="bh-block collected"><div class="label">Collected</div><div class="amount">'+fmtMoney(totalPaid)+'</div></div>'+
+      '<div class="bh-block due"><div class="label">Outstanding</div><div class="amount">'+fmtMoney(totalDue)+'</div></div>'+
+      '</div>';
+
+    if(list.length===0){
+      html += '<div class="empty-state"><div class="serif">No patients found</div>'+
+        '<p>'+(patientSearch ? 'No name matches "'+escapeHTML(patientSearch)+'".' : 'Tap the + button to add a patient'+(patientFilter==='all'?'':' for this clinic')+'.')+'</p></div>';
+    } else {
+      list.forEach(function(p){
+        var c = getClinic(p.clinicId);
+        var t = patientTotals(p);
+        var lastVisit = lastVisitDate(p);
+        html += '<div class="clinic-card patient-card" data-id="'+p.id+'">'+
+          '<span class="clinic-dot" style="background:'+(c?c.color:'#999')+'"></span>'+
+          '<div class="info"><div class="name">'+escapeHTML(p.name)+'</div>'+
+            '<div class="sub">'+escapeHTML(p.treatment||'Consultation')+(p.phone?' · '+escapeHTML(p.phone):'')+'</div>'+
+            (lastVisit ? '<div class="sub last-visit">Last visit: '+fromISO(lastVisit).toDateString().slice(4,10)+'</div>' : '')+
+          '</div>'+
+          '<div class="pc-right">'+
+            '<div class="balance">'+
+              (t.paid>0 ? '<span class="paid">'+fmtMoney(t.paid)+' paid</span>' : '<span class="paid" style="color:var(--slate)">No payments</span>')+
+              (t.pending>0 ? '<span class="due">'+fmtMoney(t.pending)+' due</span>' : '')+
+            '</div>'+
+            (p.phone ? '<div class="qa"><button class="call" data-tel="'+escapeHTML(p.phone)+'" title="Call">📞</button><button class="wa" data-wa="'+escapeHTML(p.phone)+'" title="WhatsApp">💬</button></div>' : '')+
+          '</div>'+
+        '</div>';
+      });
+    }
+
+    main.innerHTML = html;
+    document.getElementById('patientSearchInput').oninput = function(e){ patientSearch = e.target.value; render(); document.getElementById('patientSearchInput').focus(); document.getElementById('patientSearchInput').selectionStart = document.getElementById('patientSearchInput').selectionEnd = patientSearch.length; };
+    document.querySelectorAll('.patient-filter button').forEach(function(b){
+      b.onclick = function(){ patientFilter = b.dataset.filter; render(); };
+    });
+    document.querySelectorAll('.patient-card').forEach(function(el){
+      el.onclick = function(){ openPatientModal(el.dataset.id); };
+    });
+    document.querySelectorAll('[data-tel]').forEach(function(btn){
+      btn.onclick = function(e){ e.stopPropagation(); window.location.href = telLink(btn.dataset.tel); };
+    });
+    document.querySelectorAll('[data-wa]').forEach(function(btn){
+      btn.onclick = function(e){ e.stopPropagation(); window.open(waLink(btn.dataset.wa), '_blank'); };
+    });
+  }
+
+  function refreshPatientClinicSelect(){
+    var sel = document.getElementById('p_clinic');
+    sel.innerHTML = state.clinics.map(function(c){ return '<option value="'+c.id+'">'+escapeHTML(c.name)+'</option>'; }).join('');
+    if(patientFilter!=='all') sel.value = patientFilter;
+  }
+
+  function openPatientModal(id){
+    if(state.clinics.length===0){ openClinicModal(null); return; }
+    editingPatientId = id;
+    isExistingPatient = !!id;
+    refreshPatientClinicSelect();
+    var titleEl = document.getElementById('patientModalTitle');
+    var delBtn = document.getElementById('patientDelete');
+    if(id){
+      currentPatientDraft = state.patients.find(function(x){return x.id===id;});
+      titleEl.textContent = "Edit patient";
+      delBtn.style.display = "block";
+      document.getElementById('p_clinic').value = currentPatientDraft.clinicId;
+      document.getElementById('p_name').value = currentPatientDraft.name;
+      document.getElementById('p_phone').value = currentPatientDraft.phone||"";
+      document.getElementById('p_treatment').value = currentPatientDraft.treatment||"Consultation";
+      document.getElementById('p_notes').value = currentPatientDraft.notes||"";
+    } else {
+      currentPatientDraft = {
+        id: uid(),
+        clinicId: patientFilter!=='all' ? patientFilter : state.clinics[0].id,
+        name: "", phone: "", treatment: "Consultation", notes: "", payments: []
+      };
+      titleEl.textContent = "New patient";
+      delBtn.style.display = "none";
+      document.getElementById('p_clinic').value = currentPatientDraft.clinicId;
+      document.getElementById('p_name').value = "";
+      document.getElementById('p_phone').value = "";
+      document.getElementById('p_treatment').selectedIndex = 0;
+      document.getElementById('p_notes').value = "";
+    }
+    renderPatientPayments(currentPatientDraft);
+    document.getElementById('patientOverlay').classList.add('open');
+  }
+  function closePatientModal(){
+    document.getElementById('patientOverlay').classList.remove('open');
+    editingPatientId=null; currentPatientDraft=null; isExistingPatient=false;
+  }
+
+  function savePatient(){
+    var name = document.getElementById('p_name').value.trim();
+    var clinicId = document.getElementById('p_clinic').value;
+    if(!name || !clinicId) return;
+    currentPatientDraft.clinicId = clinicId;
+    currentPatientDraft.name = name;
+    currentPatientDraft.phone = document.getElementById('p_phone').value.trim();
+    currentPatientDraft.treatment = document.getElementById('p_treatment').value;
+    currentPatientDraft.notes = document.getElementById('p_notes').value.trim();
+    if(!isExistingPatient){
+      state.patients.push(currentPatientDraft);
+    }
+    save();
+    closePatientModal();
+    render();
+  }
+
+  function deletePatient(){
+    var p = state.patients.find(function(x){return x.id===editingPatientId;});
+    if(p && p.payments.length>0 && !confirm("Delete "+p.name+" and their payment history?")) return;
+    state.patients = state.patients.filter(function(x){ return x.id!==editingPatientId; });
+    save();
+    closePatientModal();
+    render();
+  }
+
+  function renderPatientPayments(p){
+    var listEl = document.getElementById('paymentsList');
+    if(p.payments.length===0){
+      listEl.innerHTML = '<p style="font-size:12.5px; color:var(--slate); margin:4px 0 10px;">No payments recorded yet.</p>';
+    } else {
+      listEl.innerHTML = p.payments.slice().sort(function(a,b){return b.date.localeCompare(a.date);}).map(function(pay){
+        return '<div class="shift-card" style="border-left-color:'+(pay.status==='paid'?'var(--teal)':'var(--gold)')+'">'+
+          '<div class="time-col"><div class="t1">'+fmtMoney(pay.amount)+'</div><div class="t2">'+pay.date+'</div></div>'+
+          '<div class="body"><div class="clinic-name">'+escapeHTML(pay.treatment||'Payment')+'</div>'+
+          '<div class="meta">'+(pay.status==='paid'?'<span class="badge confirmed">Paid</span>':'<span class="badge pending">Pending</span>')+(pay.note?'<span>'+escapeHTML(pay.note)+'</span>':'')+'</div></div>'+
+          '<button class="kebab" data-delpay="'+pay.id+'" title="Delete">✕</button>'+
+        '</div>';
+      }).join('');
+      listEl.querySelectorAll('[data-delpay]').forEach(function(btn){
+        btn.onclick = function(e){
+          e.stopPropagation();
+          p.payments = p.payments.filter(function(x){return x.id!==btn.dataset.delpay;});
+          if(isExistingPatient) save();
+          renderPatientPayments(p);
+        };
+      });
+    }
+    var t = patientTotals(p);
+    var totalsHtml = '<div class="row"><span>Paid</span><span>'+fmtMoney(t.paid)+'</span></div>';
+    if(t.pending>0) totalsHtml += '<div class="row"><span>Pending</span><span>'+fmtMoney(t.pending)+'</span></div>';
+    document.getElementById('patientTotals').innerHTML = totalsHtml;
+  }
+
+  function openPaymentModal(){
+    if(!currentPatientDraft) return;
+    document.getElementById('pay_amount').value = "";
+    document.getElementById('pay_date').value = todayISO();
+    document.getElementById('pay_status').value = "paid";
+    document.getElementById('pay_treatment').selectedIndex = 0;
+    document.getElementById('pay_note').value = "";
+    document.getElementById('paymentOverlay').classList.add('open');
+  }
+  function closePaymentModal(){ document.getElementById('paymentOverlay').classList.remove('open'); }
+
+  function savePayment(){
+    var amount = +document.getElementById('pay_amount').value || 0;
+    var date = document.getElementById('pay_date').value;
+    if(!amount || !date || !currentPatientDraft) return;
+    currentPatientDraft.payments.push({
+      id: uid(),
+      amount: amount,
+      date: date,
+      status: document.getElementById('pay_status').value,
+      treatment: document.getElementById('pay_treatment').value,
+      note: document.getElementById('pay_note').value.trim()
+    });
+    if(isExistingPatient) save();
+    closePaymentModal();
+    renderPatientPayments(currentPatientDraft);
+  }
+
+  /* ---------------- Doctor profile / onboarding ---------------- */
+  function openDoctorModal(onboarding){
+    isOnboarding = !!onboarding;
+    var titleEl = document.getElementById('doctorModalTitle');
+    var introEl = document.getElementById('doctorIntro');
+    var cancelBtn = document.getElementById('doctorCancel');
+    var saveBtn = document.getElementById('doctorSave');
+    var handle = document.getElementById('doctorHandle');
+    if(onboarding){
+      titleEl.textContent = "Welcome to DentaBay";
+      introEl.style.display = "block";
+      cancelBtn.style.display = "none";
+      saveBtn.textContent = "Get started";
+      handle.style.display = "none";
+      document.getElementById('d_name').value = "";
+      document.getElementById('d_specialty').value = "";
+      document.getElementById('d_phone').value = "";
+    } else {
+      var d = state.doctorProfile || {};
+      titleEl.textContent = "Edit profile";
+      introEl.style.display = "none";
+      cancelBtn.style.display = "block";
+      saveBtn.textContent = "Save";
+      handle.style.display = "block";
+      document.getElementById('d_name').value = d.name||"";
+      document.getElementById('d_specialty').value = d.specialty||"";
+      document.getElementById('d_phone').value = d.phone||"";
+    }
+    document.getElementById('doctorOverlay').classList.add('open');
+  }
+  function closeDoctorModal(){
+    if(isOnboarding) return;
+    document.getElementById('doctorOverlay').classList.remove('open');
+  }
+  function saveDoctorProfile(){
+    var name = document.getElementById('d_name').value.trim();
+    if(!name) return;
+    state.doctorProfile = {
+      name: name,
+      specialty: document.getElementById('d_specialty').value.trim(),
+      phone: document.getElementById('d_phone').value.trim()
+    };
+    save();
+    isOnboarding = false;
+    document.getElementById('doctorOverlay').classList.remove('open');
+    render();
+  }
+
+  /* ---------------- Clinics view ---------------- */
+  function renderClinics(main){
+    document.getElementById('monthLabel').textContent = state.clinics.length+" clinic"+(state.clinics.length===1?"":"s");
+    var d = state.doctorProfile || {};
+    var html = '<div class="clinic-card profile-card">'+
+        '<span class="clinic-dot" style="background:var(--ink)"></span>'+
+        '<div class="info"><div class="name">'+escapeHTML(d.name||'Your profile')+'</div>'+
+          '<div class="sub">'+(d.specialty?escapeHTML(d.specialty):'Add your title')+(d.phone?' · '+escapeHTML(d.phone):'')+'</div></div>'+
+        '<button class="btn-outline" id="editProfileBtn" style="width:auto; padding:8px 16px; margin:0;">Edit</button>'+
+      '</div>';
+
+    if(state.clinics.length===0){
+      html += '<div class="empty-state"><div class="serif">No clinics yet</div>'+
+        '<p>Add the practices you cover so shifts and pay rates are ready in one tap.</p>'+
+        '<button id="emptyAddClinicBtn">Add a clinic</button></div>';
+    } else {
+      state.clinics.forEach(function(c){
+        var upcoming = state.shifts.filter(function(s){return s.clinicId===c.id && s.date>=todayISO();})
+          .sort(function(a,b){return a.date.localeCompare(b.date);})[0];
+        var sub = upcoming ? "Next: "+fromISO(upcoming.date).toDateString().slice(4,10) : "No upcoming shifts";
+        html += '<div class="clinic-card" data-id="'+c.id+'">'+
+          '<span class="clinic-dot" style="background:'+c.color+'"></span>'+
+          '<div class="info"><div class="name">'+escapeHTML(c.name)+'</div><div class="sub">'+sub+'</div></div>'+
+          '<div class="rate">'+(c.rateType==='hourly' ? fmtMoney(c.rate)+'/hr' : fmtMoney(c.rate)+'/shift')+'</div>'+
+        '</div>';
+      });
+      html += '<button class="add-clinic-btn" id="addClinicBtn">+ Add another clinic</button>';
+    }
+
+    html += '<button class="add-clinic-btn" id="logoutBtn" style="border-color:#F0C9C1; color:var(--coral); margin-top:22px;">Log out</button>';
+
+    main.innerHTML = html;
+    var b1 = document.getElementById('emptyAddClinicBtn'); if(b1) b1.onclick=function(){openClinicModal(null);};
+    var b2 = document.getElementById('addClinicBtn'); if(b2) b2.onclick=function(){openClinicModal(null);};
+    document.querySelectorAll('.clinic-card[data-id]').forEach(function(el){
+      el.onclick = function(){ openClinicModal(el.dataset.id); };
+    });
+    document.getElementById('editProfileBtn').onclick = function(){ openDoctorModal(false); };
+    document.getElementById('logoutBtn').onclick = function(){
+      if(!confirm("Log out of DentaBay? Your clinics, shifts and patients stay saved on this device — you'll just need to re-enter your profile next time.")) return;
+      state.doctorProfile = null;
+      save();
+      render();
+      openDoctorModal(true);
+    };
+  }
+
+  /* ---------------- Earnings view ---------------- */
+  function renderEarnings(main){
+    document.getElementById('monthLabel').textContent = "";
+    var now = new Date();
+    var scopeShifts;
+    var label;
+    if(earningsScope==='week'){
+      var ws = startOfWeek(now), we = addDays(ws,6);
+      scopeShifts = state.shifts.filter(function(s){ return s.date>=toISO(ws) && s.date<=toISO(we); });
+      label = "This week";
+    } else {
+      scopeShifts = state.shifts.filter(function(s){
+        var d = fromISO(s.date);
+        return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+      });
+      label = "This month";
+    }
+    var confirmed = scopeShifts.filter(function(s){return s.status==='confirmed';});
+    var pending = scopeShifts.filter(function(s){return s.status==='pending';});
+    var confirmedTotal = confirmed.reduce(function(a,s){return a+(+s.pay||0);},0);
+    var pendingTotal = pending.reduce(function(a,s){return a+(+s.pay||0);},0);
+
+    var html = '<div class="earnings-hero"><div class="label">Confirmed earnings — '+label.toLowerCase()+'</div>'+
+      '<div class="amount">'+fmtMoney(confirmedTotal)+'</div>'+
+      '<div class="sub">'+(pendingTotal>0 ? '+ '+fmtMoney(pendingTotal)+' pending confirmation' : 'No pending shifts')+'</div></div>';
+
+    html += '<div class="earnings-toggle">'+
+      '<button data-scope="week" class="'+(earningsScope==='week'?'active':'')+'">Week</button>'+
+      '<button data-scope="month" class="'+(earningsScope==='month'?'active':'')+'">Month</button>'+
+      '</div>';
+
+    if(scopeShifts.length===0){
+      html += '<div class="empty-state"><div class="serif">Nothing booked '+label.toLowerCase()+'</div><p>Earnings appear here once you add shifts.</p></div>';
+    } else {
+      var byClinic = {};
+      scopeShifts.forEach(function(s){
+        byClinic[s.clinicId] = (byClinic[s.clinicId]||0) + (+s.pay||0);
+      });
+      var maxVal = Math.max.apply(null, Object.keys(byClinic).map(function(k){return byClinic[k];}));
+      Object.keys(byClinic).sort(function(a,b){return byClinic[b]-byClinic[a];}).forEach(function(cid){
+        var c = getClinic(cid);
+        var pct = maxVal ? Math.round(byClinic[cid]/maxVal*100) : 0;
+        html += '<div class="bar-row"><div class="top"><span>'+(c?escapeHTML(c.name):'Unknown')+'</span><span class="n">'+fmtMoney(byClinic[cid])+'</span></div>'+
+          '<div class="bar-track"><div class="bar-fill" style="width:'+pct+'%; background:'+(c?c.color:'#999')+'"></div></div></div>';
+      });
+    }
+
+    main.innerHTML = html;
+    document.querySelectorAll('.earnings-toggle button').forEach(function(b){
+      b.onclick = function(){ earningsScope = b.dataset.scope; render(); };
+    });
+  }
+
+  /* ---------------- Shift modal ---------------- */
+  function refreshClinicSelect(){
+    var sel = document.getElementById('f_clinic');
+    sel.innerHTML = state.clinics.map(function(c){ return '<option value="'+c.id+'">'+escapeHTML(c.name)+'</option>'; }).join('');
+  }
+
+  function openShiftModal(id, presetDate){
+    if(state.clinics.length===0){
+      openClinicModal(null);
+      return;
+    }
+    editingShiftId = id;
+    refreshClinicSelect();
+    document.getElementById('shiftConflictWarn').innerHTML = "";
+    var titleEl = document.getElementById('shiftModalTitle');
+    var delBtn = document.getElementById('shiftDelete');
+    if(id){
+      var s = state.shifts.find(function(x){return x.id===id;});
+      titleEl.textContent = "Edit shift";
+      delBtn.style.display = "block";
+      document.getElementById('f_clinic').value = s.clinicId;
+      document.getElementById('f_date').value = s.date;
+      document.getElementById('f_start').value = s.start;
+      document.getElementById('f_end').value = s.end;
+      document.getElementById('f_status').value = s.status;
+      document.getElementById('f_pay').value = s.pay;
+      document.getElementById('f_notes').value = s.notes||"";
+    } else {
+      titleEl.textContent = "New shift";
+      delBtn.style.display = "none";
+      document.getElementById('f_clinic').selectedIndex = 0;
+      document.getElementById('f_date').value = presetDate || selectedDate;
+      document.getElementById('f_start').value = "09:00";
+      document.getElementById('f_end').value = "17:00";
+      document.getElementById('f_status').value = "pending";
+      document.getElementById('f_notes').value = "";
+      autofillPay();
+    }
+    document.getElementById('shiftOverlay').classList.add('open');
+  }
+  function closeShiftModal(){ document.getElementById('shiftOverlay').classList.remove('open'); }
+
+  function autofillPay(){
+    var c = getClinic(document.getElementById('f_clinic').value);
+    if(!c) return;
+    var start = document.getElementById('f_start').value, end = document.getElementById('f_end').value;
+    document.getElementById('f_pay').value = computePay(c, start, end);
+  }
+
+  function saveShift(){
+    var clinicId = document.getElementById('f_clinic').value;
+    var date = document.getElementById('f_date').value;
+    var start = document.getElementById('f_start').value;
+    var end = document.getElementById('f_end').value;
+    if(!clinicId || !date || !start || !end){ return; }
+    var obj = {
+      id: editingShiftId || uid(),
+      clinicId: clinicId,
+      date: date,
+      start: start,
+      end: end,
+      status: document.getElementById('f_status').value,
+      pay: +document.getElementById('f_pay').value || 0,
+      notes: document.getElementById('f_notes').value.trim()
+    };
+    if(editingShiftId){
+      state.shifts = state.shifts.map(function(s){ return s.id===editingShiftId ? obj : s; });
+    } else {
+      state.shifts.push(obj);
+    }
+    save();
+    closeShiftModal();
+    selectedDate = date;
+    var d = fromISO(date);
+    monthAnchor = new Date(d.getFullYear(), d.getMonth(), 1);
+    render();
+  }
+
+  function deleteShift(){
+    var s = state.shifts.find(function(x){return x.id===editingShiftId;});
+    if(s && s.recurringGenerated){
+      state.recurringSkips.push(skipKey(s.date, s.recurringSlot));
+    }
+    state.shifts = state.shifts.filter(function(x){ return x.id!==editingShiftId; });
+    save();
+    closeShiftModal();
+    render();
+  }
+
+  /* ---------------- Clinic modal ---------------- */
+  function openClinicModal(id){
+    editingClinicId = id;
+    var titleEl = document.getElementById('clinicModalTitle');
+    var delBtn = document.getElementById('clinicDelete');
+    if(id){
+      var c = getClinic(id);
+      titleEl.textContent = "Edit clinic";
+      delBtn.style.display = "block";
+      document.getElementById('c_color').value = c.color;
+      document.getElementById('c_name').value = c.name;
+      document.getElementById('c_address').value = c.address||"";
+      document.getElementById('c_contact').value = c.contact||"";
+      document.getElementById('c_rate').value = c.rate;
+      setRateMode(c.rateType);
+    } else {
+      titleEl.textContent = "New clinic";
+      delBtn.style.display = "none";
+      document.getElementById('c_color').value = nextPaletteColor();
+      document.getElementById('c_name').value = "";
+      document.getElementById('c_address').value = "";
+      document.getElementById('c_contact').value = "";
+      document.getElementById('c_rate').value = "";
+      setRateMode("hourly");
+    }
+    document.getElementById('clinicOverlay').classList.add('open');
+  }
+  function closeClinicModal(){ document.getElementById('clinicOverlay').classList.remove('open'); }
+
+  function setRateMode(mode){
+    rateMode = mode;
+    document.querySelectorAll('.rate-toggle button').forEach(function(b){ b.classList.toggle('active', b.dataset.rate===mode); });
+    document.getElementById('c_rateLabel').textContent = mode==='hourly' ? "Rate per hour (DA)" : "Flat rate per shift (DA)";
+  }
+
+  function saveClinic(){
+    var name = document.getElementById('c_name').value.trim();
+    if(!name) return;
+    var obj = {
+      id: editingClinicId || uid(),
+      name: name,
+      color: document.getElementById('c_color').value,
+      address: document.getElementById('c_address').value.trim(),
+      contact: document.getElementById('c_contact').value.trim(),
+      rateType: rateMode,
+      rate: +document.getElementById('c_rate').value || 0
+    };
+    if(editingClinicId){
+      state.clinics = state.clinics.map(function(c){ return c.id===editingClinicId ? obj : c; });
+    } else {
+      state.clinics.push(obj);
+    }
+    save();
+    var wasEmpty = state.clinics.length===1 && !editingClinicId;
+    closeClinicModal();
+    render();
+    if(wasEmpty){ openShiftModal(null, selectedDate); }
+  }
+
+  function deleteClinic(){
+    var hasShifts = state.shifts.some(function(s){return s.clinicId===editingClinicId;});
+    if(hasShifts && !confirm("This clinic has shifts on the calendar. Delete the clinic and its shifts?")) return;
+    state.shifts = state.shifts.filter(function(s){ return s.clinicId!==editingClinicId; });
+    state.clinics = state.clinics.filter(function(c){ return c.id!==editingClinicId; });
+    save();
+    closeClinicModal();
+    render();
+  }
+
+  /* ---------------- Wiring ---------------- */
+  document.querySelectorAll('.bottombar button').forEach(function(b){
+    b.onclick = function(){ view = b.dataset.view; render(); };
+  });
+  document.getElementById('fabAdd').onclick = function(){
+    if(view==="patients") openPatientModal(null);
+    else openShiftModal(null, selectedDate);
+  };
+  document.getElementById('settingsBtn').onclick = function(){ view = "clinics"; render(); };
+
+  document.getElementById('shiftCancel').onclick = closeShiftModal;
+  document.getElementById('shiftSave').onclick = saveShift;
+  document.getElementById('shiftDelete').onclick = deleteShift;
+  ['f_clinic','f_start','f_end'].forEach(function(id){
+    document.getElementById(id).addEventListener('change', function(){ if(!editingShiftId) autofillPay(); });
+  });
+  document.getElementById('shiftOverlay').addEventListener('click', function(e){ if(e.target===this) closeShiftModal(); });
+
+  document.getElementById('clinicCancel').onclick = closeClinicModal;
+  document.getElementById('clinicSave').onclick = saveClinic;
+  document.getElementById('clinicDelete').onclick = deleteClinic;
+  document.querySelectorAll('.rate-toggle button').forEach(function(b){ b.onclick = function(){ setRateMode(b.dataset.rate); }; });
+  document.getElementById('clinicOverlay').addEventListener('click', function(e){ if(e.target===this) closeClinicModal(); });
+
+  document.getElementById('slotCancel').onclick = closeSlotModal;
+  document.getElementById('slotClear').onclick = clearSlot;
+  document.getElementById('slotOverlay').addEventListener('click', function(e){ if(e.target===this) closeSlotModal(); });
+
+  document.getElementById('patientCancel').onclick = closePatientModal;
+  document.getElementById('patientSave').onclick = savePatient;
+  document.getElementById('patientDelete').onclick = deletePatient;
+  document.getElementById('addPaymentBtn').onclick = openPaymentModal;
+  document.getElementById('patientOverlay').addEventListener('click', function(e){ if(e.target===this) closePatientModal(); });
+
+  document.getElementById('paymentCancel').onclick = closePaymentModal;
+  document.getElementById('paymentSave').onclick = savePayment;
+  document.getElementById('paymentOverlay').addEventListener('click', function(e){ if(e.target===this) closePaymentModal(); });
+
+  document.getElementById('doctorCancel').onclick = closeDoctorModal;
+  document.getElementById('doctorSave').onclick = saveDoctorProfile;
+  document.getElementById('doctorOverlay').addEventListener('click', function(e){ if(e.target===this && !isOnboarding) closeDoctorModal(); });
+
+  generateRecurringShifts();
+  render();
+  if(!state.doctorProfile){ openDoctorModal(true); }
+})();
+</script>
+</body>
+</html>
