@@ -111,6 +111,14 @@
   .badge.confirmed{background:#E4F0EA; color:var(--teal-deep);}
   .badge.pending{background:#FBF0DC; color:#8A6417;}
   .badge.conflict{background:#FBE3DE; color:#A8402E;}
+  .rdv-actions{display:flex; gap:6px; margin-top:6px;}
+  .rdv-actions button{
+    padding:5px 10px; border-radius:14px; border:1px solid var(--sand-line); background:var(--white);
+    font-size:11px; font-weight:600; color:var(--slate); cursor:pointer;
+  }
+  .rdv-actions button.active.respected{background:var(--teal); color:var(--white); border-color:var(--teal);}
+  .rdv-actions button.active.missed{background:var(--coral); color:var(--white); border-color:var(--coral);}
+  .rdv-actions button:not(.active):hover{border-color:var(--ink); color:var(--ink);}
   .shift-card .pay{font-weight:700; font-size:14px; white-space:nowrap;}
   .shift-card .kebab{
     position:absolute; top:10px; right:10px; border:none; background:none;
@@ -158,15 +166,15 @@
   }
   .slot-settings .srow .sep{color:var(--slate); font-size:12px;}
 
-  .tt-wrap{overflow-x:auto; margin:0 -18px; padding:0 18px 4px;}
-  table.tt-table{border-collapse:separate; border-spacing:5px; width:100%; min-width:560px;}
+  .tt-wrap{margin:0; padding:0;}
+  table.tt-table{border-collapse:separate; border-spacing:5px; width:100%; table-layout:fixed;}
   table.tt-table th{
     font-size:11px; font-weight:600; color:var(--slate); padding:0 0 4px; text-align:center;
   }
-  table.tt-table th.slot-hd{text-align:left; min-width:64px;}
-  table.tt-table td.slot-label{font-size:11.5px; font-weight:600; color:var(--slate); white-space:nowrap; padding-right:6px;}
+  table.tt-table th.slot-hd{text-align:left; width:46px;}
+  table.tt-table td.slot-label{font-size:11.5px; font-weight:600; color:var(--slate); white-space:nowrap; padding-right:4px;}
   .tt-cell{
-    width:70px; height:52px; border-radius:11px; border:1.5px dashed var(--sand-line); background:var(--white);
+    width:100%; height:56px; border-radius:11px; border:1.5px dashed var(--sand-line); background:var(--white);
     cursor:pointer; display:flex; align-items:center; justify-content:center; text-align:center;
     padding:4px; font-size:11px; font-weight:600; color:var(--slate); line-height:1.2;
     transition:border-color .15s ease;
@@ -506,7 +514,14 @@
       <label>Notes (optional)</label>
       <textarea id="p_notes" placeholder="Treatment plan, allergies, anything worth remembering"></textarea>
     </div>
-    <div id="patientPaymentsSection">
+    <div id="patientAppointmentsSection">
+      <div class="field" style="margin-bottom:8px;">
+        <label>Appointments</label>
+      </div>
+      <div id="appointmentsList"></div>
+      <button class="btn-outline" id="addAppointmentBtn">+ Add appointment</button>
+    </div>
+    <div id="patientPaymentsSection" style="margin-top:18px;">
       <div class="field" style="margin-bottom:8px;">
         <label>Payments</label>
       </div>
@@ -570,6 +585,41 @@
   </div>
 </div>
 
+<!-- Appointment (RDV) modal -->
+<div class="overlay" id="appointmentOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>Add appointment</h2>
+    <div class="row2">
+      <div class="field">
+        <label>Date</label>
+        <input type="date" id="rdv_date">
+      </div>
+      <div class="field">
+        <label>Time (optional)</label>
+        <input type="time" id="rdv_time">
+      </div>
+    </div>
+    <div class="field">
+      <label>Reason / notes (optional)</label>
+      <input type="text" id="rdv_notes" placeholder="e.g. follow-up, check filling">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn-ghost" id="appointmentCancel">Cancel</button>
+      <button class="btn-primary" id="appointmentSave">Save appointment</button>
+    </div>
+  </div>
+</div>
+
+<!-- Patient picker (for adding an appointment from the Appointments list) -->
+<div class="overlay" id="patientPickerOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h2>Choose a patient</h2>
+    <div id="patientPickerList"></div>
+  </div>
+</div>
+
 <!-- Doctor profile / sign up modal -->
 <div class="overlay" id="doctorOverlay">
   <div class="sheet">
@@ -628,6 +678,10 @@
   };
   if(!state.recurringSkips) state.recurringSkips = [];
   if(!state.patients) state.patients = [];
+  state.patients.forEach(function(p){
+    if(!p.appointments) p.appointments = [];
+    p.appointments.forEach(function(rdv){ if(rdv.status===undefined) rdv.status = ""; });
+  });
   if(!state.doctorProfiles) state.doctorProfiles = [];
   if(state.activeProfileId===undefined) state.activeProfileId = null;
   if(state.doctorProfile && state.doctorProfiles.length===0){
@@ -637,6 +691,7 @@
     delete state.doctorProfile;
   }
   var patientFilter = "all";
+  var patientsTab = "patients";
   var patientSearch = "";
   var editingPatientId = null;
   var currentPatientDraft = null;
@@ -872,10 +927,12 @@
       var isToday = iso===todayISO();
       var isSel = iso===selectedDate;
       var list = shiftsOnDate(iso);
+      var rdvs = appointmentsOnDate(iso);
       html += '<div class="month-cell'+(otherMonth?' other-month':'')+(isToday?' today':'')+(isSel?' selected-cell':'')+'" data-date="'+iso+'">'+d.getDate();
-      if(list.length){
+      if(list.length || rdvs.length){
         html += '<div class="mdots">';
-        list.slice(0,4).forEach(function(s){ var c=getClinic(s.clinicId); html+='<span style="background:'+(c?c.color:'#999')+'"></span>'; });
+        list.slice(0,3).forEach(function(s){ var c=getClinic(s.clinicId); html+='<span style="background:'+(c?c.color:'#999')+'"></span>'; });
+        if(rdvs.length) html += '<span style="background:var(--gold)"></span>';
         html += '</div>';
       }
       html += '</div>';
@@ -894,6 +951,22 @@
       agendaList.forEach(function(s){ html += shiftCardHTML(s); });
     }
     html += '</div>';
+
+    var dayRdvs = appointmentsOnDate(selectedDate);
+    if(dayRdvs.length>0){
+      html += '<div class="day-group"><h3>Appointments</h3>';
+      dayRdvs.forEach(function(rdv){
+        var c = getClinic(rdv.clinicId);
+        var badge = rdv.status==='respected' ? '<span class="badge confirmed">Respected</span>'
+          : rdv.status==='missed' ? '<span class="badge conflict">Missed</span>' : '';
+        html += '<div class="shift-card" data-rdv-patient="'+rdv.patientId+'" style="border-left-color:'+(rdv.status==='missed'?'var(--coral)':'var(--gold)')+';">'+
+          '<div class="time-col"><div class="t1">'+(rdv.time?fmtTime(rdv.time):'—')+'</div></div>'+
+          '<div class="body"><div class="clinic-name">'+escapeHTML(rdv.patientName)+'</div>'+
+          '<div class="meta">'+badge+(c?'<span>'+escapeHTML(c.name)+'</span>':'')+(rdv.notes?'<span>'+escapeHTML(rdv.notes)+'</span>':'')+'</div></div>'+
+        '</div>';
+      });
+      html += '</div>';
+    }
 
     // month summary
     var monthShifts = state.shifts.filter(function(s){
@@ -918,8 +991,11 @@
     document.querySelectorAll('.month-cell').forEach(function(el){
       el.onclick = function(){ selectedDate = el.dataset.date; render(); };
     });
-    document.querySelectorAll('.shift-card').forEach(function(el){
+    document.querySelectorAll('.shift-card[data-id]').forEach(function(el){
       el.onclick = function(e){ if(e.target.classList.contains('kebab')) return; openShiftModal(el.dataset.id); };
+    });
+    document.querySelectorAll('.shift-card[data-rdv-patient]').forEach(function(el){
+      el.onclick = function(){ openPatientModal(el.dataset.rdvPatient); };
     });
     var eb = document.getElementById('emptyAddShift'); if(eb) eb.onclick=function(){openShiftModal(null, selectedDate);};
     var ec = document.getElementById('emptyAddClinic'); if(ec) ec.onclick=function(){openClinicModal(null);};
@@ -949,12 +1025,12 @@
     html += '</div>';
 
     html += '<div class="tt-wrap"><table class="tt-table"><thead><tr><th class="slot-hd"></th>';
-    DAY_ORDER.forEach(function(wd){ html += '<th>'+DAY_LABELS[wd]+'</th>'; });
+    SLOTS.forEach(function(slot){ html += '<th>'+SLOT_LABELS[slot]+'</th>'; });
     html += '</tr></thead><tbody>';
 
-    SLOTS.forEach(function(slot){
-      html += '<tr><td class="slot-label">'+SLOT_LABELS[slot]+'</td>';
-      DAY_ORDER.forEach(function(wd){
+    DAY_ORDER.forEach(function(wd){
+      html += '<tr><td class="slot-label">'+DAY_LABELS[wd]+'</td>';
+      SLOTS.forEach(function(slot){
         var dayRow = state.timetable[wd] || {};
         var clinicId = dayRow[slot];
         var c = clinicId ? getClinic(clinicId) : null;
@@ -1046,14 +1122,29 @@
   }
 
   function renderPatients(main){
-    document.getElementById('monthLabel').textContent = "";
     if(state.clinics.length===0){
+      document.getElementById('monthLabel').textContent = "";
       main.innerHTML = '<div class="empty-state"><div class="serif">Add a clinic first</div>'+
         '<p>Patients are grouped by clinic, so add your clinics before adding patients.</p>'+
         '<button id="ptEmptyAddClinic">Add a clinic</button></div>';
       document.getElementById('ptEmptyAddClinic').onclick = function(){ openClinicModal(null); };
       return;
     }
+    var html = '<div class="subtabs">'+
+      '<button data-ptab="patients" class="'+(patientsTab==='patients'?'active':'')+'">Patients</button>'+
+      '<button data-ptab="appointments" class="'+(patientsTab==='appointments'?'active':'')+'">Appointments</button>'+
+      '</div><div id="patientsContent"></div>';
+    main.innerHTML = html;
+    document.querySelectorAll('.subtabs button').forEach(function(b){
+      b.onclick = function(){ patientsTab = b.dataset.ptab; render(); };
+    });
+    var content = document.getElementById('patientsContent');
+    if(patientsTab==='appointments') renderAppointmentsList(content);
+    else renderPatientsList(content);
+  }
+
+  function renderPatientsList(main){
+    document.getElementById('monthLabel').textContent = "";
 
     var html = '<input type="text" class="search-input" id="patientSearchInput" placeholder="Search patients by name" value="'+escapeHTML(patientSearch)+'">';
 
@@ -1118,6 +1209,92 @@
     });
   }
 
+  function allAppointmentsFlat(){
+    var list = [];
+    state.patients.forEach(function(p){
+      if(patientFilter!=='all' && p.clinicId!==patientFilter) return;
+      p.appointments.forEach(function(rdv){
+        list.push({rdvId:rdv.id, patientId:p.id, patientName:p.name, clinicId:p.clinicId, date:rdv.date, time:rdv.time, notes:rdv.notes, status:rdv.status});
+      });
+    });
+    return list.sort(function(a,b){ return a.date.localeCompare(b.date) || (a.time||"").localeCompare(b.time||""); });
+  }
+
+  function renderAppointmentsList(main){
+    document.getElementById('monthLabel').textContent = "";
+
+    var html = '<div class="patient-filter">';
+    html += '<button data-filter="all" class="'+(patientFilter==='all'?'active':'')+'">All clinics</button>';
+    state.clinics.forEach(function(c){
+      html += '<button data-filter="'+c.id+'" class="'+(patientFilter===c.id?'active':'')+'"><span class="fdot" style="background:'+c.color+'"></span>'+escapeHTML(c.name)+'</button>';
+    });
+    html += '</div>';
+
+    var list = allAppointmentsFlat();
+    if(list.length===0){
+      html += '<div class="empty-state"><div class="serif">No appointments yet</div>'+
+        '<p>Tap the + button to schedule one for a patient.</p></div>';
+    } else {
+      var todayIso = todayISO();
+      var lastDate = null;
+      list.forEach(function(rdv){
+        if(rdv.date!==lastDate){
+          if(lastDate!==null) html += '</div>';
+          var d = fromISO(rdv.date);
+          html += '<div class="day-group"><h3>'+dayName(d)+', '+monthName(d)+' '+d.getDate()+(rdv.date===todayIso?' · Today':'')+'</h3>';
+          lastDate = rdv.date;
+        }
+        var c = getClinic(rdv.clinicId);
+        var isPast = rdv.date < todayIso;
+        var badge = rdv.status==='respected' ? '<span class="badge confirmed">Respected</span>'
+          : rdv.status==='missed' ? '<span class="badge conflict">Missed</span>'
+          : (isPast ? '<span class="badge pending">Past</span>' : '<span class="badge confirmed">Upcoming</span>');
+        html += '<div class="shift-card" style="border-left-color:'+(rdv.status==='missed'?'var(--coral)':'var(--gold)')+';">'+
+          '<div class="time-col"><div class="t1">'+(rdv.time?fmtTime(rdv.time):'—')+'</div></div>'+
+          '<div class="body" data-openpatient="'+rdv.patientId+'"><div class="clinic-name">'+escapeHTML(rdv.patientName)+'</div>'+
+          '<div class="meta">'+badge+(c?'<span>'+escapeHTML(c.name)+'</span>':'')+(rdv.notes?'<span>'+escapeHTML(rdv.notes)+'</span>':'')+'</div>'+
+          '<div class="rdv-actions">'+
+            '<button data-rdvstatus="respected" data-pid="'+rdv.patientId+'" data-rid="'+rdv.rdvId+'" class="'+(rdv.status==='respected'?'active respected':'')+'">✓ Respected</button>'+
+            '<button data-rdvstatus="missed" data-pid="'+rdv.patientId+'" data-rid="'+rdv.rdvId+'" class="'+(rdv.status==='missed'?'active missed':'')+'">✗ Missed</button>'+
+          '</div>'+
+          '</div>'+
+          '<button class="kebab" data-delrdv2="'+rdv.rdvId+'" data-pid="'+rdv.patientId+'" title="Delete">✕</button>'+
+        '</div>';
+      });
+      if(lastDate!==null) html += '</div>';
+    }
+
+    main.innerHTML = html;
+    document.querySelectorAll('.patient-filter button').forEach(function(b){
+      b.onclick = function(){ patientFilter = b.dataset.filter; render(); };
+    });
+    document.querySelectorAll('[data-openpatient]').forEach(function(el){
+      el.onclick = function(){ openPatientModal(el.dataset.openpatient); };
+    });
+    document.querySelectorAll('[data-rdvstatus]').forEach(function(btn){
+      btn.onclick = function(e){
+        e.stopPropagation();
+        var p = state.patients.find(function(x){return x.id===btn.dataset.pid;});
+        if(!p) return;
+        var rdv = p.appointments.find(function(x){return x.id===btn.dataset.rid;});
+        if(!rdv) return;
+        rdv.status = (rdv.status===btn.dataset.rdvstatus) ? "" : btn.dataset.rdvstatus;
+        save();
+        render();
+      };
+    });
+    document.querySelectorAll('[data-delrdv2]').forEach(function(btn){
+      btn.onclick = function(e){
+        e.stopPropagation();
+        var p = state.patients.find(function(x){return x.id===btn.dataset.pid;});
+        if(!p) return;
+        p.appointments = p.appointments.filter(function(x){return x.id!==btn.dataset.delrdv2;});
+        save();
+        render();
+      };
+    });
+  }
+
   function refreshPatientClinicSelect(){
     var sel = document.getElementById('p_clinic');
     sel.innerHTML = state.clinics.map(function(c){ return '<option value="'+c.id+'">'+escapeHTML(c.name)+'</option>'; }).join('');
@@ -1144,7 +1321,7 @@
       currentPatientDraft = {
         id: uid(),
         clinicId: patientFilter!=='all' ? patientFilter : state.clinics[0].id,
-        name: "", phone: "", treatment: "Consultation", notes: "", payments: []
+        name: "", phone: "", treatment: "Consultation", notes: "", payments: [], appointments: []
       };
       titleEl.textContent = "New patient";
       delBtn.style.display = "none";
@@ -1155,6 +1332,7 @@
       document.getElementById('p_notes').value = "";
     }
     renderPatientPayments(currentPatientDraft);
+    renderPatientAppointments(currentPatientDraft);
     document.getElementById('patientOverlay').classList.add('open');
   }
   function closePatientModal(){
@@ -1248,6 +1426,115 @@
     closePaymentModal();
     renderPatientPayments(currentPatientDraft);
   }
+
+  /* ---------------- Patient appointments (RDVs) ---------------- */
+  function renderPatientAppointments(p){
+    var listEl = document.getElementById('appointmentsList');
+    if(p.appointments.length===0){
+      listEl.innerHTML = '<p style="font-size:12.5px; color:var(--slate); margin:4px 0 10px;">No appointments scheduled yet.</p>';
+      return;
+    }
+    var todayIso = todayISO();
+    listEl.innerHTML = p.appointments.slice().sort(function(a,b){return a.date.localeCompare(b.date) || (a.time||"").localeCompare(b.time||"");}).map(function(rdv){
+      var isPast = rdv.date < todayIso;
+      var badge = rdv.status==='respected' ? '<span class="badge confirmed">Respected</span>'
+        : rdv.status==='missed' ? '<span class="badge conflict">Missed</span>'
+        : (isPast ? '<span class="badge pending">Past</span>' : '<span class="badge confirmed">Upcoming</span>');
+      return '<div class="shift-card" style="border-left-color:'+(rdv.status==='missed'?'var(--coral)':(isPast?'var(--slate)':'var(--gold)'))+'; opacity:'+(isPast&&!rdv.status?'.6':'1')+';">'+
+        '<div class="time-col"><div class="t1">'+fromISO(rdv.date).toDateString().slice(4,10)+'</div><div class="t2">'+(rdv.time?fmtTime(rdv.time):'')+'</div></div>'+
+        '<div class="body"><div class="clinic-name">'+(rdv.notes?escapeHTML(rdv.notes):'Appointment')+'</div>'+
+        '<div class="meta">'+badge+'</div>'+
+        '<div class="rdv-actions">'+
+          '<button data-rdvstatus="respected" data-id="'+rdv.id+'" class="'+(rdv.status==='respected'?'active respected':'')+'">✓ Respected</button>'+
+          '<button data-rdvstatus="missed" data-id="'+rdv.id+'" class="'+(rdv.status==='missed'?'active missed':'')+'">✗ Missed</button>'+
+        '</div>'+
+        '</div>'+
+        '<button class="kebab" data-delrdv="'+rdv.id+'" title="Delete">✕</button>'+
+      '</div>';
+    }).join('');
+    listEl.querySelectorAll('[data-delrdv]').forEach(function(btn){
+      btn.onclick = function(e){
+        e.stopPropagation();
+        p.appointments = p.appointments.filter(function(x){return x.id!==btn.dataset.delrdv;});
+        if(isExistingPatient) save();
+        renderPatientAppointments(p);
+      };
+    });
+    listEl.querySelectorAll('[data-rdvstatus]').forEach(function(btn){
+      btn.onclick = function(e){
+        e.stopPropagation();
+        var rdv = p.appointments.find(function(x){return x.id===btn.dataset.id;});
+        if(!rdv) return;
+        rdv.status = (rdv.status===btn.dataset.rdvstatus) ? "" : btn.dataset.rdvstatus;
+        if(isExistingPatient) save();
+        renderPatientAppointments(p);
+      };
+    });
+  }
+
+  function openAppointmentModal(){
+    if(!currentPatientDraft) return;
+    document.getElementById('rdv_date').value = todayISO();
+    document.getElementById('rdv_time').value = "";
+    document.getElementById('rdv_notes').value = "";
+    document.getElementById('appointmentOverlay').classList.add('open');
+  }
+  function closeAppointmentModal(){ document.getElementById('appointmentOverlay').classList.remove('open'); }
+
+  function saveAppointment(){
+    var date = document.getElementById('rdv_date').value;
+    if(!date || !currentPatientDraft) return;
+    currentPatientDraft.appointments.push({
+      id: uid(),
+      date: date,
+      time: document.getElementById('rdv_time').value,
+      notes: document.getElementById('rdv_notes').value.trim(),
+      status: ""
+    });
+    if(isExistingPatient) save();
+    closeAppointmentModal();
+    renderPatientAppointments(currentPatientDraft);
+    if(view==="patients") render();
+  }
+
+  function appointmentsOnDate(iso){
+    var list = [];
+    state.patients.forEach(function(p){
+      p.appointments.forEach(function(rdv){
+        if(rdv.date===iso) list.push({patientId:p.id, patientName:p.name, clinicId:p.clinicId, time:rdv.time, notes:rdv.notes, status:rdv.status});
+      });
+    });
+    return list.sort(function(a,b){ return (a.time||"").localeCompare(b.time||""); });
+  }
+
+  function openPatientPicker(){
+    var list = document.getElementById('patientPickerList');
+    var patients = state.patients.filter(function(p){ return patientFilter==='all' || p.clinicId===patientFilter; })
+      .sort(function(a,b){ return a.name.localeCompare(b.name); });
+    if(patients.length===0){
+      list.innerHTML = '<p style="font-size:12.5px; color:var(--slate); margin:4px 0 10px;">No patients yet — add one first.</p>';
+    } else {
+      list.innerHTML = patients.map(function(p){
+        var c = getClinic(p.clinicId);
+        return '<div class="clinic-card" data-pid="'+p.id+'">'+
+          '<span class="clinic-dot" style="background:'+(c?c.color:'#999')+'"></span>'+
+          '<div class="info"><div class="name">'+escapeHTML(p.name)+'</div></div>'+
+        '</div>';
+      }).join('');
+      list.querySelectorAll('[data-pid]').forEach(function(el){
+        el.onclick = function(){
+          var p = state.patients.find(function(x){return x.id===el.dataset.pid;});
+          if(!p) return;
+          currentPatientDraft = p;
+          isExistingPatient = true;
+          document.getElementById('patientPickerOverlay').classList.remove('open');
+          openAppointmentModal();
+        };
+      });
+    }
+    document.getElementById('patientPickerOverlay').classList.add('open');
+  }
+  function closePatientPicker(){ document.getElementById('patientPickerOverlay').classList.remove('open'); }
 
   /* ---------------- Doctor profile: sign up / choose profile ---------------- */
   function activeProfile(){
@@ -1636,7 +1923,10 @@
     b.onclick = function(){ view = b.dataset.view; render(); };
   });
   document.getElementById('fabAdd').onclick = function(){
-    if(view==="patients") openPatientModal(null);
+    if(view==="patients"){
+      if(patientsTab==="appointments") openPatientPicker();
+      else openPatientModal(null);
+    }
     else openShiftModal(null, selectedDate);
   };
   document.getElementById('settingsBtn').onclick = function(){ view = "clinics"; render(); };
@@ -1664,11 +1954,17 @@
   document.getElementById('patientSave').onclick = savePatient;
   document.getElementById('patientDelete').onclick = deletePatient;
   document.getElementById('addPaymentBtn').onclick = openPaymentModal;
+  document.getElementById('addAppointmentBtn').onclick = openAppointmentModal;
   document.getElementById('patientOverlay').addEventListener('click', function(e){ if(e.target===this) closePatientModal(); });
 
   document.getElementById('paymentCancel').onclick = closePaymentModal;
   document.getElementById('paymentSave').onclick = savePayment;
   document.getElementById('paymentOverlay').addEventListener('click', function(e){ if(e.target===this) closePaymentModal(); });
+
+  document.getElementById('appointmentCancel').onclick = closeAppointmentModal;
+  document.getElementById('appointmentSave').onclick = saveAppointment;
+  document.getElementById('appointmentOverlay').addEventListener('click', function(e){ if(e.target===this) closeAppointmentModal(); });
+  document.getElementById('patientPickerOverlay').addEventListener('click', function(e){ if(e.target===this) closePatientPicker(); });
 
   document.getElementById('doctorCancel').onclick = closeDoctorModal;
   document.getElementById('doctorSave').onclick = saveDoctorProfile;
