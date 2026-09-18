@@ -119,6 +119,22 @@
   .rdv-actions button.active.respected{background:var(--teal); color:var(--white); border-color:var(--teal);}
   .rdv-actions button.active.missed{background:var(--coral); color:var(--white); border-color:var(--coral);}
   .rdv-actions button:not(.active):hover{border-color:var(--ink); color:var(--ink);}
+
+  /* ---------- Report ---------- */
+  .report-header{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:2px;}
+  .report-brand{font-family:'Fraunces',serif; font-weight:600; font-size:18px; color:var(--ink);}
+  .report-doctor{font-size:12px; color:var(--slate); text-align:right;}
+  .report-period{font-size:13px; color:var(--slate); margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--sand-line);}
+  .report-row{display:flex; justify-content:space-between; padding:8px 0; font-size:14px; border-bottom:1px solid var(--sand-line); color:var(--ink);}
+  .report-row span:last-child{font-weight:600;}
+  .report-row.short span:last-child{color:var(--coral);}
+  .report-subhead{font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--slate); margin:18px 0 8px;}
+  .report-clinic-block{margin-bottom:10px; padding-bottom:8px; border-bottom:1px dashed var(--sand-line);}
+  .report-clinic-name{font-weight:600; font-size:13.5px; margin-bottom:4px; color:var(--ink);}
+  .report-disc-row{display:flex; justify-content:space-between; font-size:12px; padding:7px 0; border-bottom:1px solid var(--sand-line); gap:10px; color:var(--ink);}
+  .report-disc-row b{color:var(--coral);}
+  .report-disc-total{font-size:13px; font-weight:700; color:var(--coral); margin-top:10px; text-align:right;}
+  .report-footer{font-size:10.5px; color:var(--slate); margin-top:20px; text-align:center;}
   .shift-card .pay{font-weight:700; font-size:14px; white-space:nowrap;}
   .shift-card .kebab{
     position:absolute; top:10px; right:10px; border:none; background:none;
@@ -574,6 +590,11 @@
         <option value="Other">Other</option>
       </select>
     </div>
+    <div class="field" id="pay_taken_wrap" style="display:none;">
+      <label>Amount you actually took (DA)</label>
+      <input type="number" id="pay_taken" min="0" step="50">
+      <div style="font-size:11.5px; color:var(--slate); margin-top:5px;">Defaults to your calculated share — change it if you took less (e.g. no change).</div>
+    </div>
     <div class="field">
       <label>Note (optional)</label>
       <input type="text" id="pay_note" placeholder="e.g. tooth #36, 2nd session, deposit">
@@ -620,6 +641,18 @@
   </div>
 </div>
 
+<!-- Earnings report -->
+<div class="overlay" id="reportOverlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div id="reportCanvas" style="background:#fff; border-radius:12px; padding:20px; border:1px solid var(--sand-line);"></div>
+    <div class="sheet-actions" style="margin-top:16px;">
+      <button class="btn-ghost" id="reportClose">Close</button>
+      <button class="btn-primary" id="reportDownload">Download PNG</button>
+    </div>
+  </div>
+</div>
+
 <!-- Doctor profile / sign up modal -->
 <div class="overlay" id="doctorOverlay">
   <div class="sheet">
@@ -657,6 +690,7 @@
   </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script>
 
 (function(){
@@ -664,32 +698,45 @@
 
   /* ---------------- State ---------------- */
   var STORE_KEY = "locum_planner_v1";
+  var IDB_NAME = "dentabay-db";
+  var IDB_STORE = "kv";
   var PALETTE = ["#2F6F62","#C79A3F","#7A5FB0","#3B6FA0","#B0555F","#4E8B6E","#A16A3D"];
-  var state = load() || { clinics: [], shifts: [], timetable: {}, slotTimes: {
+
+  function defaultState(){
+    return { clinics: [], shifts: [], timetable: {}, slotTimes: {
+        morning:{start:"08:00",end:"12:00"},
+        afternoon:{start:"12:00",end:"17:00"},
+        evening:{start:"17:00",end:"20:00"}
+      }, recurringSkips: [], patients: [], doctorProfiles: [], activeProfileId: null };
+  }
+  var state = defaultState();
+
+  function normalizeState(){
+    if(!state.timetable) state.timetable = {};
+    if(!state.slotTimes) state.slotTimes = {
       morning:{start:"08:00",end:"12:00"},
       afternoon:{start:"12:00",end:"17:00"},
       evening:{start:"17:00",end:"20:00"}
-    }, recurringSkips: [], patients: [] };
-  if(!state.timetable) state.timetable = {};
-  if(!state.slotTimes) state.slotTimes = {
-    morning:{start:"08:00",end:"12:00"},
-    afternoon:{start:"12:00",end:"17:00"},
-    evening:{start:"17:00",end:"20:00"}
-  };
-  if(!state.recurringSkips) state.recurringSkips = [];
-  if(!state.patients) state.patients = [];
-  state.patients.forEach(function(p){
-    if(!p.appointments) p.appointments = [];
-    p.appointments.forEach(function(rdv){ if(rdv.status===undefined) rdv.status = ""; });
-  });
-  if(!state.doctorProfiles) state.doctorProfiles = [];
-  if(state.activeProfileId===undefined) state.activeProfileId = null;
-  if(state.doctorProfile && state.doctorProfiles.length===0){
-    var migrated = { id: uid(), name: state.doctorProfile.name||"", specialty: state.doctorProfile.specialty||"", phone: state.doctorProfile.phone||"" };
-    state.doctorProfiles.push(migrated);
-    state.activeProfileId = migrated.id;
-    delete state.doctorProfile;
+    };
+    if(!state.recurringSkips) state.recurringSkips = [];
+    if(!state.clinics) state.clinics = [];
+    if(!state.shifts) state.shifts = [];
+    if(!state.patients) state.patients = [];
+    state.patients.forEach(function(p){
+      if(!p.appointments) p.appointments = [];
+      p.appointments.forEach(function(rdv){ if(rdv.status===undefined) rdv.status = ""; });
+    });
+    if(!state.doctorProfiles) state.doctorProfiles = [];
+    if(state.activeProfileId===undefined) state.activeProfileId = null;
+    if(state.doctorProfile && state.doctorProfiles.length===0){
+      var migrated = { id: uid(), name: state.doctorProfile.name||"", specialty: state.doctorProfile.specialty||"", phone: state.doctorProfile.phone||"" };
+      state.doctorProfiles.push(migrated);
+      state.activeProfileId = migrated.id;
+      delete state.doctorProfile;
+    }
   }
+  normalizeState();
+
   var patientFilter = "all";
   var patientsTab = "patients";
   var patientSearch = "";
@@ -712,14 +759,67 @@
   var editingClinicId = null;
   var rateMode = "split";
 
-  function load(){
-    try{
-      var raw = localStorage.getItem(STORE_KEY);
-      return raw ? JSON.parse(raw) : null;
-    }catch(e){ return null; }
+  /* ---------------- IndexedDB persistence ---------------- */
+  function idbOpen(){
+    return new Promise(function(resolve, reject){
+      if(!window.indexedDB){ reject(new Error("IndexedDB not available")); return; }
+      var req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = function(e){ e.target.result.createObjectStore(IDB_STORE); };
+      req.onsuccess = function(e){ resolve(e.target.result); };
+      req.onerror = function(){ reject(req.error); };
+    });
   }
+  function idbGet(key){
+    return idbOpen().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(IDB_STORE, "readonly");
+        var req = tx.objectStore(IDB_STORE).get(key);
+        req.onsuccess = function(){ resolve(req.result); };
+        req.onerror = function(){ reject(req.error); };
+      });
+    });
+  }
+  function idbSet(key, val){
+    return idbOpen().then(function(db){
+      return new Promise(function(resolve, reject){
+        var tx = db.transaction(IDB_STORE, "readwrite");
+        tx.objectStore(IDB_STORE).put(val, key);
+        tx.oncomplete = function(){ resolve(); };
+        tx.onerror = function(){ reject(tx.error); };
+      });
+    });
+  }
+
   function save(){
-    try{ localStorage.setItem(STORE_KEY, JSON.stringify(state)); }catch(e){}
+    try{
+      idbSet(STORE_KEY, state).catch(function(e){ console.error("DentaBay: save failed", e); });
+    }catch(e){ console.error("DentaBay: save failed", e); }
+  }
+
+  function loadState(){
+    return idbGet(STORE_KEY).then(function(saved){
+      if(saved){ state = saved; normalizeState(); return; }
+      // First run on this device after switching storage: migrate any old localStorage data once.
+      var migratedFromLocalStorage = false;
+      try{
+        var raw = localStorage.getItem(STORE_KEY);
+        if(raw){
+          state = JSON.parse(raw);
+          normalizeState();
+          migratedFromLocalStorage = true;
+        }
+      }catch(e){}
+      if(migratedFromLocalStorage){
+        save();
+        try{ localStorage.removeItem(STORE_KEY); }catch(e){}
+      }
+    }).catch(function(e){
+      console.error("DentaBay: IndexedDB unavailable, falling back to localStorage", e);
+      try{
+        var raw = localStorage.getItem(STORE_KEY);
+        if(raw){ state = JSON.parse(raw); normalizeState(); }
+      }catch(e2){}
+    });
   }
   function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
 
@@ -1106,8 +1206,10 @@
   function patientTotals(p){
     var paid = p.payments.filter(function(x){return x.status==='paid';}).reduce(function(a,x){return a+(+x.amount||0);},0);
     var pending = p.payments.filter(function(x){return x.status==='pending';}).reduce(function(a,x){return a+(+x.amount||0);},0);
-    var myShare = p.payments.filter(function(x){return x.status==='paid';}).reduce(function(a,x){return a+(+x.share||0);},0);
-    return {paid:paid, pending:pending, myShare:myShare};
+    var paidPayments = p.payments.filter(function(x){return x.status==='paid';});
+    var myShare = paidPayments.reduce(function(a,x){return a+(+x.share||0);},0);
+    var myTaken = paidPayments.reduce(function(a,x){return a+((x.taken!==undefined)?(+x.taken||0):(+x.share||0));},0);
+    return {paid:paid, pending:pending, myShare:myShare, myTaken:myTaken};
   }
   function lastVisitDate(p){
     if(!p.payments.length) return null;
@@ -1372,11 +1474,13 @@
       listEl.innerHTML = '<p style="font-size:12.5px; color:var(--slate); margin:4px 0 10px;">No payments recorded yet.</p>';
     } else {
       listEl.innerHTML = p.payments.slice().sort(function(a,b){return b.date.localeCompare(a.date);}).map(function(pay){
+        var short = pay.share>0 && pay.taken!==undefined && pay.taken<pay.share;
         return '<div class="shift-card" style="border-left-color:'+(pay.status==='paid'?'var(--teal)':'var(--gold)')+'">'+
           '<div class="time-col"><div class="t1">'+fmtMoney(pay.amount)+'</div><div class="t2">'+pay.date+'</div></div>'+
           '<div class="body"><div class="clinic-name">'+escapeHTML(pay.treatment||'Payment')+'</div>'+
           '<div class="meta">'+(pay.status==='paid'?'<span class="badge confirmed">Paid</span>':'<span class="badge pending">Pending</span>')+(pay.note?'<span>'+escapeHTML(pay.note)+'</span>':'')+'</div>'+
           (pay.share>0 ? '<div class="meta" style="margin-top:2px;"><span style="color:var(--teal-deep); font-weight:600;">Your share: '+fmtMoney(pay.share)+'</span></div>' : '')+
+          (short ? '<div class="meta" style="margin-top:2px;"><span style="color:var(--coral); font-weight:600;">Took '+fmtMoney(pay.taken)+' ('+fmtMoney(pay.share-pay.taken)+' short)</span></div>' : '')+
           '</div>'+
           '<button class="kebab" data-delpay="'+pay.id+'" title="Delete">✕</button>'+
         '</div>';
@@ -1394,6 +1498,7 @@
     var totalsHtml = '<div class="row"><span>Paid</span><span>'+fmtMoney(t.paid)+'</span></div>';
     if(t.pending>0) totalsHtml += '<div class="row"><span>Pending</span><span>'+fmtMoney(t.pending)+'</span></div>';
     if(t.myShare>0) totalsHtml += '<div class="row"><span>Your share</span><span>'+fmtMoney(t.myShare)+'</span></div>';
+    if(t.myTaken>0 && t.myTaken<t.myShare) totalsHtml += '<div class="row"><span>Actually taken</span><span style="color:var(--coral);">'+fmtMoney(t.myTaken)+'</span></div>';
     document.getElementById('patientTotals').innerHTML = totalsHtml;
   }
 
@@ -1404,15 +1509,28 @@
     document.getElementById('pay_status').value = "paid";
     document.getElementById('pay_treatment').selectedIndex = 0;
     document.getElementById('pay_note').value = "";
+    document.getElementById('pay_taken').value = "";
+    var clinic = getClinic(currentPatientDraft.clinicId);
+    document.getElementById('pay_taken_wrap').style.display = (clinic && clinic.rateType==='split') ? "block" : "none";
     document.getElementById('paymentOverlay').classList.add('open');
   }
   function closePaymentModal(){ document.getElementById('paymentOverlay').classList.remove('open'); }
+
+  function autofillTaken(){
+    var clinic = getClinic(currentPatientDraft.clinicId);
+    if(!clinic || clinic.rateType!=='split') return;
+    var amount = +document.getElementById('pay_amount').value || 0;
+    document.getElementById('pay_taken').value = doctorShare(clinic, amount);
+  }
 
   function savePayment(){
     var amount = +document.getElementById('pay_amount').value || 0;
     var date = document.getElementById('pay_date').value;
     if(!amount || !date || !currentPatientDraft) return;
     var clinic = getClinic(currentPatientDraft.clinicId);
+    var share = doctorShare(clinic, amount);
+    var isSplit = clinic && clinic.rateType==='split';
+    var taken = isSplit ? (document.getElementById('pay_taken').value==="" ? share : (+document.getElementById('pay_taken').value||0)) : 0;
     currentPatientDraft.payments.push({
       id: uid(),
       amount: amount,
@@ -1420,7 +1538,8 @@
       status: document.getElementById('pay_status').value,
       treatment: document.getElementById('pay_treatment').value,
       note: document.getElementById('pay_note').value.trim(),
-      share: doctorShare(clinic, amount)
+      share: share,
+      taken: taken
     });
     if(isExistingPatient) save();
     closePaymentModal();
@@ -1742,13 +1861,110 @@
       });
     }
 
+    html += '<button class="btn-outline" id="openReportBtn" style="margin-top:18px;">Generate report</button>';
+
     main.innerHTML = html;
     document.querySelectorAll('.earnings-toggle button').forEach(function(b){
       b.onclick = function(){ earningsScope = b.dataset.scope; render(); };
     });
+    document.getElementById('openReportBtn').onclick = function(){
+      renderReport(earningsScope);
+      document.getElementById('reportOverlay').classList.add('open');
+    };
   }
 
-  /* ---------------- Shift modal ---------------- */
+  /* ---------------- Earnings report ---------------- */
+  function reportRow(label, val, highlight){
+    return '<div class="report-row'+(highlight?' short':'')+'"><span>'+label+'</span><span>'+fmtMoney(val)+'</span></div>';
+  }
+
+  function buildReportData(scope){
+    var now = new Date();
+    var inScope, label;
+    if(scope==='week'){
+      var ws = startOfWeek(now), we = addDays(ws,6);
+      var wsIso = toISO(ws), weIso = toISO(we);
+      inScope = function(d){ return d>=wsIso && d<=weIso; };
+      label = monthName(ws).slice(0,3)+' '+ws.getDate()+' – '+monthName(we).slice(0,3)+' '+we.getDate()+', '+we.getFullYear();
+    } else {
+      inScope = function(d){ var dd=fromISO(d); return dd.getFullYear()===now.getFullYear() && dd.getMonth()===now.getMonth(); };
+      label = monthName(now)+' '+now.getFullYear();
+    }
+
+    var perClinic = {};
+    var discrepancies = [];
+    var grandTotal=0, grandShare=0, grandTaken=0;
+
+    state.patients.forEach(function(p){
+      var clinic = getClinic(p.clinicId);
+      if(!clinic || clinic.rateType!=='split') return;
+      p.payments.forEach(function(pay){
+        if(pay.status!=='paid' || !inScope(pay.date)) return;
+        var cid = p.clinicId;
+        if(!perClinic[cid]) perClinic[cid] = {total:0, share:0, taken:0};
+        var taken = (pay.taken!==undefined && pay.taken!==null) ? (+pay.taken||0) : (+pay.share||0);
+        perClinic[cid].total += (+pay.amount||0);
+        perClinic[cid].share += (+pay.share||0);
+        perClinic[cid].taken += taken;
+        grandTotal += (+pay.amount||0);
+        grandShare += (+pay.share||0);
+        grandTaken += taken;
+        var diff = (+pay.share||0) - taken;
+        if(diff > 0.01){
+          discrepancies.push({date:pay.date, patientName:p.name, expected:+pay.share||0, taken:taken, diff:diff});
+        }
+      });
+    });
+
+    return {
+      label:label, perClinic:perClinic, discrepancies:discrepancies,
+      grandTotal:grandTotal, grandShare:grandShare, grandTaken:grandTaken,
+      grandClinicShare: grandTotal - grandShare
+    };
+  }
+
+  function renderReport(scope){
+    var data = buildReportData(scope);
+    var doc = activeProfile() || {};
+    var html = '<div class="report-header">'+
+        '<div class="report-brand">DentaBay</div>'+
+        '<div class="report-doctor">'+escapeHTML(doc.name||'')+(doc.specialty?'<br>'+escapeHTML(doc.specialty):'')+'</div>'+
+      '</div>'+
+      '<div class="report-period">'+escapeHTML(data.label)+'</div>';
+
+    html += reportRow('Total billed to patients', data.grandTotal);
+    html += reportRow('Your share (calculated)', data.grandShare);
+    html += reportRow("Clinic's share", data.grandClinicShare);
+    html += reportRow('You actually collected', data.grandTaken, data.grandTaken<data.grandShare);
+
+    var clinicIds = Object.keys(data.perClinic);
+    if(clinicIds.length>1){
+      html += '<div class="report-subhead">By clinic</div>';
+      clinicIds.forEach(function(cid){
+        var c = getClinic(cid); var row = data.perClinic[cid];
+        html += '<div class="report-clinic-block"><div class="report-clinic-name">'+(c?escapeHTML(c.name):'Unknown')+'</div>'+
+          reportRow('Total', row.total)+
+          reportRow('Your share', row.share)+
+          reportRow('Collected', row.taken, row.taken<row.share)+
+        '</div>';
+      });
+    }
+
+    if(data.discrepancies.length>0){
+      html += '<div class="report-subhead">Partial collections</div>';
+      data.discrepancies.forEach(function(d){
+        html += '<div class="report-disc-row"><span>'+fromISO(d.date).toDateString().slice(4,10)+' — '+escapeHTML(d.patientName)+'</span>'+
+          '<span>Expected '+fmtMoney(d.expected)+', took '+fmtMoney(d.taken)+' <b>('+fmtMoney(d.diff)+' short)</b></span></div>';
+      });
+      var totalShort = data.discrepancies.reduce(function(a,d){return a+d.diff;},0);
+      html += '<div class="report-disc-total">Total short from partial collections: '+fmtMoney(totalShort)+'</div>';
+    }
+
+    html += '<div class="report-footer">Generated by DentaBay on '+new Date().toDateString()+'</div>';
+    document.getElementById('reportCanvas').innerHTML = html;
+  }
+
+
   function refreshClinicSelect(){
     var sel = document.getElementById('f_clinic');
     sel.innerHTML = state.clinics.map(function(c){ return '<option value="'+c.id+'">'+escapeHTML(c.name)+'</option>'; }).join('');
@@ -1959,12 +2175,28 @@
 
   document.getElementById('paymentCancel').onclick = closePaymentModal;
   document.getElementById('paymentSave').onclick = savePayment;
+  document.getElementById('pay_amount').addEventListener('input', autofillTaken);
   document.getElementById('paymentOverlay').addEventListener('click', function(e){ if(e.target===this) closePaymentModal(); });
 
   document.getElementById('appointmentCancel').onclick = closeAppointmentModal;
   document.getElementById('appointmentSave').onclick = saveAppointment;
   document.getElementById('appointmentOverlay').addEventListener('click', function(e){ if(e.target===this) closeAppointmentModal(); });
   document.getElementById('patientPickerOverlay').addEventListener('click', function(e){ if(e.target===this) closePatientPicker(); });
+
+  document.getElementById('reportClose').onclick = function(){ document.getElementById('reportOverlay').classList.remove('open'); };
+  document.getElementById('reportOverlay').addEventListener('click', function(e){ if(e.target===this) document.getElementById('reportOverlay').classList.remove('open'); });
+  document.getElementById('reportDownload').onclick = function(){
+    if(typeof html2canvas === 'undefined'){
+      alert('Downloading needs an internet connection the first time, to load the export tool.');
+      return;
+    }
+    html2canvas(document.getElementById('reportCanvas'), {scale:2, backgroundColor:'#ffffff'}).then(function(canvas){
+      var link = document.createElement('a');
+      link.download = 'dentabay-report-'+todayISO()+'.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+  };
 
   document.getElementById('doctorCancel').onclick = closeDoctorModal;
   document.getElementById('doctorSave').onclick = saveDoctorProfile;
@@ -1981,9 +2213,11 @@
   };
   document.getElementById('profilePickerOverlay').addEventListener('click', function(e){ if(e.target===this) closeProfilePicker(); });
 
-  generateRecurringShifts();
-  render();
-  if(!state.activeProfileId){ showProfileGate(); }
+  loadState().then(function(){
+    generateRecurringShifts();
+    render();
+    if(!state.activeProfileId){ showProfileGate(); }
+  });
 })();
 </script>
 </body>
